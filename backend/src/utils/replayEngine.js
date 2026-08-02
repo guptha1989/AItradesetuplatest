@@ -169,6 +169,13 @@ class ReplayEngine {
     const atm = Math.round(spot / 50) * 50;
     const timeStr = this.getTimeString();
 
+    // Lock 09:16 AM Day Open prices when reaching minute 1 (09:16 IST)
+    if (this.currentMinute === 1) {
+      const { setOpenPriceData } = require('./srCalculator');
+      setOpenPriceData(spot, chain, '09:16:00 AM', true);
+      logger.info(`Replay 09:16 AM Day Open prices locked (Spot: ${spot})`);
+    }
+
     // Broadcast tick feed
     wsServer.broadcast('TICK_FEED', {
       type: 'TICK',
@@ -256,7 +263,28 @@ class ReplayEngine {
     this.dayLow = this.basePrice || 24383.6;
     this.generatedSignals = [];
     this.generateTrajectory();
+    this._historicalChain = null;
+    this._historicalSpot  = null;
+    this._historicalDate  = null;
     logger.info('Replay reset to 09:15 IST');
+  }
+
+  /**
+   * Inject historical option chain data (e.g. from 31-July-2026 EOD).
+   * Once set, getCurrentChain() returns this data instead of simulated data.
+   * All API endpoints that call getCurrentChain() will see the real historical data.
+   */
+  setHistoricalChain(chain, spot, date) {
+    this._historicalChain = chain;
+    this._historicalSpot  = spot;
+    this._historicalDate  = date;
+    if (spot && spot > 1000) {
+      this.spotPrice = spot;
+      this.basePrice = spot;
+      this.dayHigh   = spot;
+      this.dayLow    = spot;
+    }
+    logger.info(`Historical chain loaded: ${date}, ${chain.length} strikes, spot=${spot}`);
   }
 
   getStatus() {
@@ -270,11 +298,16 @@ class ReplayEngine {
       dayLow: this.dayLow,
       progressPct: parseFloat(((this.currentMinute / 375) * 100).toFixed(1)),
       totalSignals: this.generatedSignals.length,
+      historicalDate: this._historicalDate || null,
     };
   }
 
   // Get current snapshot of option chain for REST endpoint fallback
+  // Returns historical chain if loaded, otherwise simulated chain
   getCurrentChain() {
+    if (this._historicalChain && this._historicalChain.length > 0) {
+      return this._historicalChain;
+    }
     return this.getChainForPrice(this.spotPrice);
   }
 }

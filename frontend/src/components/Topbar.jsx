@@ -1,7 +1,7 @@
 import { useTradingStore } from '../store/tradingStore';
 
 export default function Topbar() {
-  const { wsConnected, paperMode, spot, spotChange, spotChangePercent, tradingHalted, vix } = useTradingStore();
+  const { wsConnected, paperMode, spot, spotChange, spotChangePercent, tradingHalted, vix, historicalDate } = useTradingStore();
 
   const formatSpot = (val) => val ? val.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—';
   const changeColor = spotChange > 0 ? 'var(--color-profit)' : spotChange < 0 ? 'var(--color-loss)' : 'var(--color-text-muted)';
@@ -48,6 +48,17 @@ export default function Topbar() {
         <span className={`badge ${paperMode ? 'badge-paper' : 'badge-live'}`}>
           {paperMode ? '📝 PAPER' : '🔴 LIVE'}
         </span>
+        {historicalDate && (
+          <span style={{
+            background: 'rgba(16,185,129,0.15)',
+            color: 'var(--color-profit)',
+            border: '1px solid rgba(16,185,129,0.3)',
+            borderRadius: '5px',
+            padding: '2px 8px',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+          }}>📅 {historicalDate}</span>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
           <span className={`live-dot ${wsConnected ? '' : 'red'}`}></span>
           {wsConnected ? 'Connected' : 'Disconnected'}

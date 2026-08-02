@@ -51,13 +51,18 @@ export const useTradingStore = create((set, get) => ({
   recentOrders: [],
   alerts: [],
 
-  // ─── System ───────────────────────────────────
+  // ─── System ───────────────────────────────────────────────
   paperMode: true,
   tradingHalted: false,
   haltReason: null,
   sessionPhase: 'MORNING',
 
-  // ─── UI ───────────────────────────────────────
+  // ─── Historical Mode ──────────────────────────────────────
+  historicalDate: null,      // e.g. '2026-07-31' when loaded
+  historicalLoading: false,
+  historicalError: null,
+
+  // ─── UI ───────────────────────────────────────────────────
   activePage: 'dashboard',
   setActivePage: (page) => set({ activePage: page }),
 
@@ -171,6 +176,37 @@ export const useTradingStore = create((set, get) => ({
       }
     } catch (e) {
       console.error('fetchLiveData error:', e);
+    }
+  },
+
+  // ─── Historical Snapshot Load ─────────────────────────────
+  loadHistoricalData: async (date = '2026-07-31') => {
+    set({ historicalLoading: true, historicalError: null });
+    try {
+      const res = await fetch(`${API_BASE}/historical/snapshot?date=${date}`).then(r => r.json());
+      if (res.error && !res.chain) throw new Error(res.error);
+
+      const chain = res.chain || [];
+      const spot  = res.spot  || get().spot;
+      const atm   = res.atm   || (Math.round(spot / 50) * 50);
+      const pcr   = res.pcr   || get().pcr;
+
+      set({
+        historicalDate: res.date || date,
+        historicalLoading: false,
+        optionChain: chain,
+        spot,
+        atm,
+        pcr,
+        lastChainUpdate: new Date().toLocaleTimeString('en-IN'),
+      });
+
+      // Also push the spot into replay engine state so VIX / day metrics update
+      return res;
+    } catch (e) {
+      console.error('loadHistoricalData error:', e);
+      set({ historicalLoading: false, historicalError: e.message });
+      throw e;
     }
   },
 

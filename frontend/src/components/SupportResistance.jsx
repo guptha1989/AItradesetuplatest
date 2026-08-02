@@ -15,34 +15,34 @@ export default function SupportResistance() {
   const [loading, setLoading] = useState(false);
   const [selectedStrike, setSelectedStrike] = useState(null);
 
-  // Manual ATM override
+  // Spot S/R Manual Override
   const autoAtm = atm || (spot ? Math.round(spot / 50) * 50 : 24250);
-  const [manualAtmInput, setManualAtmInput] = useState('');
-  const [useManualAtm, setUseManualAtm] = useState(false);
-  const [appliedAtm, setAppliedAtm] = useState(null); // committed manual ATM
-  const manualAtmVal = parseInt(manualAtmInput);
+  const [manualSpotInput, setManualSpotInput] = useState('');
+  const [useManualSpot, setUseManualSpot] = useState(false);
+  const [appliedSpotAtm, setAppliedSpotAtm] = useState(null);
 
-  // effectiveAtm: use committed appliedAtm if set, otherwise auto
-  const effectiveAtm = (useManualAtm && appliedAtm && appliedAtm > 0) ? appliedAtm : autoAtm;
+  // Premium S/R Manual Override
+  const [manualPremiumInput, setManualPremiumInput] = useState('');
+  const [useManualPremium, setUseManualPremium] = useState(false);
+  const [appliedPremiumStrike, setAppliedPremiumStrike] = useState(null);
 
-  const currentAtm = effectiveAtm;
-  const activeStrike = selectedStrike || currentAtm;
+  const effectiveSpotAtm = (useManualSpot && appliedSpotAtm && appliedSpotAtm > 0) ? appliedSpotAtm : autoAtm;
+  const effectivePremiumStrike = (useManualPremium && appliedPremiumStrike && appliedPremiumStrike > 0) ? appliedPremiumStrike : effectiveSpotAtm;
 
   useEffect(() => {
-    fetchSRData(effectiveAtm, activeStrike);
-  }, [calcBasis, activeStrike, spot, effectiveAtm]);
+    fetchSRData(effectiveSpotAtm, effectivePremiumStrike);
+  }, [calcBasis, spot, effectiveSpotAtm, effectivePremiumStrike]);
 
-  // Accept explicit atmVal and strikeVal to avoid stale closure bugs on manual apply
-  const fetchSRData = async (atmVal, strikeVal) => {
-    const resolvedAtm    = (atmVal    !== undefined) ? atmVal    : effectiveAtm;
-    const resolvedStrike = (strikeVal !== undefined) ? strikeVal : activeStrike;
+  const fetchSRData = async (spotAtmVal, premiumStrikeVal) => {
+    const resolvedSpotAtm    = (spotAtmVal        !== undefined) ? spotAtmVal        : effectiveSpotAtm;
+    const resolvedPremiumStr = (premiumStrikeVal !== undefined) ? premiumStrikeVal : effectivePremiumStrike;
     setLoading(true);
     try {
       const params = new URLSearchParams({
         mode: calcBasis,
         spot: spot || 24383.6,
-        strike: resolvedStrike,
-        atm: resolvedAtm,
+        atm: resolvedSpotAtm,
+        strike: resolvedPremiumStr,
       });
       const res = await fetch(`${API_BASE}/sr?${params}`).then(r => r.json());
       setData(res);
@@ -53,24 +53,38 @@ export default function SupportResistance() {
     }
   };
 
-  const handleManualAtmApply = () => {
-    if (!isNaN(manualAtmVal) && manualAtmVal > 0) {
-      const snapped = Math.round(manualAtmVal / 50) * 50;
-      setAppliedAtm(snapped);
-      setUseManualAtm(true);
-      setSelectedStrike(null);
-      // fetch immediately with the snapped value — no state race
-      fetchSRData(snapped, snapped);
+  const handleSpotApply = () => {
+    const val = parseInt(manualSpotInput);
+    if (!isNaN(val) && val > 0) {
+      const snapped = Math.round(val / 50) * 50;
+      setAppliedSpotAtm(snapped);
+      setUseManualSpot(true);
+      fetchSRData(snapped, effectivePremiumStrike);
     }
   };
 
-  const handleResetAtm = () => {
-    setUseManualAtm(false);
-    setAppliedAtm(null);
-    setManualAtmInput('');
-    setSelectedStrike(null);
-    // fetch with auto ATM immediately
-    fetchSRData(autoAtm, autoAtm);
+  const handleResetSpot = () => {
+    setUseManualSpot(false);
+    setAppliedSpotAtm(null);
+    setManualSpotInput('');
+    fetchSRData(autoAtm, effectivePremiumStrike);
+  };
+
+  const handlePremiumApply = () => {
+    const val = parseInt(manualPremiumInput);
+    if (!isNaN(val) && val > 0) {
+      const snapped = Math.round(val / 50) * 50;
+      setAppliedPremiumStrike(snapped);
+      setUseManualPremium(true);
+      fetchSRData(effectiveSpotAtm, snapped);
+    }
+  };
+
+  const handleResetPremium = () => {
+    setUseManualPremium(false);
+    setAppliedPremiumStrike(null);
+    setManualPremiumInput('');
+    fetchSRData(effectiveSpotAtm, effectiveSpotAtm);
   };
 
   const spotRows = data?.spotRows || [];
@@ -83,20 +97,21 @@ export default function SupportResistance() {
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>🎯 Support & Resistance (Spot & Premium)</h1>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            Techfrost Nifty_V6_SR Engine | Spot Projections (Image 1) & Option Premium Levels (Image 2)
+            Techfrost Nifty_V6_SR Engine | Independent Manual Controls for Spot S/R & Option Premium S/R
             {spot && ` | Current Spot: ₹${spot.toLocaleString('en-IN')}`}
-            {` | ATM Strike: ${currentAtm}`}
+            {` | Spot ATM: ${effectiveSpotAtm}`}
+            {` | Premium Strike: ${effectivePremiumStrike}`}
           </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => fetchSRData(effectiveAtm, activeStrike)} disabled={loading}>
+        <button className="btn btn-primary btn-sm" onClick={() => fetchSRData(effectiveSpotAtm, effectivePremiumStrike)} disabled={loading}>
           {loading ? '⏳' : '🔄'} Recalculate
         </button>
       </div>
 
-      {/* Basis, ATM Override & Strike selector */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+      {/* Basis & Separate Manual Setting Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '16px' }}>
         {/* Calculation Basis */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {CALC_BASES.map(b => (
             <div
               key={b.value}
@@ -108,6 +123,7 @@ export default function SupportResistance() {
                 background: calcBasis === b.value ? 'rgba(59,130,246,0.08)' : 'var(--color-bg-card)',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
+                height: '100%',
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: '2px', fontSize: '0.85rem' }}>{b.label}</div>
@@ -116,85 +132,111 @@ export default function SupportResistance() {
           ))}
         </div>
 
-        {/* Right column: Manual ATM + Strike Picker stacked */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-          {/* Manual ATM Strike Entry */}
-          <div className="card" style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>MANUAL ATM STRIKE OVERRIDE</span>
-              {useManualAtm && (
-                <span
-                  onClick={handleResetAtm}
-                  style={{ fontSize: '0.65rem', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}
-                >
-                  ✕ Reset to Auto ({autoAtm})
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                type="number"
-                step="50"
-                placeholder={`Auto: ${autoAtm}`}
-                value={manualAtmInput}
-                onChange={e => setManualAtmInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleManualAtmApply()}
-                style={{
-                  flex: 1,
-                  background: 'var(--color-bg-elevated)',
-                  border: `1px solid ${useManualAtm ? '#f59e0b' : 'var(--color-border)'}`,
-                  color: useManualAtm ? '#f59e0b' : 'var(--color-text-primary)',
-                  borderRadius: '8px',
-                  padding: '6px 12px',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  fontFamily: 'JetBrains Mono, monospace',
-                  outline: 'none',
-                  width: '100%',
-                }}
-              />
-              <button
-                onClick={handleManualAtmApply}
-                style={{
-                  background: '#f59e0b',
-                  color: '#0a0e1a',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '6px 14px',
-                  fontWeight: 800,
-                  fontSize: '0.82rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Apply
-              </button>
-            </div>
-            <div style={{ marginTop: '6px', fontSize: '0.7rem', color: useManualAtm ? '#f59e0b' : 'var(--color-text-muted)' }}>
-              {useManualAtm
-                ? `⚡ Using manual ATM: ${effectiveAtm} (overriding auto ${autoAtm})`
-                : `Auto-detected ATM: ${autoAtm} from live spot ₹${(spot || 24383.6).toFixed(2)}`}
-            </div>
+        {/* 1. Spot S/R Manual Setting */}
+        <div className="card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>📍 SPOT S/R MANUAL ATM</span>
+            {useManualSpot && (
+              <span onClick={handleResetSpot} style={{ fontSize: '0.65rem', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>
+                ✕ Reset ({autoAtm})
+              </span>
+            )}
           </div>
-
-          {/* Selected Strike Picker (for Premium S/R column) */}
-          <div className="card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>CHOSEN STRIKE (PREMIUM S/R)</div>
-            <select
-              value={activeStrike}
-              onChange={e => setSelectedStrike(parseInt(e.target.value))}
-              style={{ width: '100%', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', borderRadius: '8px', padding: '6px 12px', fontSize: '0.95rem', fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="number"
+              step="50"
+              placeholder={`Auto: ${autoAtm}`}
+              value={manualSpotInput}
+              onChange={e => setManualSpotInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSpotApply()}
+              style={{
+                flex: 1,
+                background: 'var(--color-bg-elevated)',
+                border: `1px solid ${useManualSpot ? '#f59e0b' : 'var(--color-border)'}`,
+                color: useManualSpot ? '#f59e0b' : 'var(--color-text-primary)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                fontFamily: 'JetBrains Mono, monospace',
+                outline: 'none',
+                width: '100%',
+              }}
+            />
+            <button
+              onClick={handleSpotApply}
+              style={{
+                background: '#f59e0b',
+                color: '#0a0e1a',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
             >
-              {[-4, -3, -2, -1, 0, 1, 2, 3, 4].map(offset => {
-                const str = currentAtm + offset * 50;
-                return (
-                  <option key={str} value={str}>
-                    {str} {offset === 0 ? '(ATM)' : offset > 0 ? `(+${offset * 50})` : `(${offset * 50})`}
-                  </option>
-                );
-              })}
-            </select>
+              Apply
+            </button>
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '0.68rem', color: useManualSpot ? '#f59e0b' : 'var(--color-text-muted)' }}>
+            {useManualSpot ? `⚡ Manual Spot ATM: ${effectiveSpotAtm}` : `Auto Spot ATM: ${autoAtm}`}
+          </div>
+        </div>
+
+        {/* 2. Option Premium S/R Manual Setting */}
+        <div className="card" style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>📊 PREMIUM S/R MANUAL STRIKE</span>
+            {useManualPremium && (
+              <span onClick={handleResetPremium} style={{ fontSize: '0.65rem', color: '#ef4444', cursor: 'pointer', fontWeight: 700 }}>
+                ✕ Reset ({effectiveSpotAtm})
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="number"
+              step="50"
+              placeholder={`Auto: ${effectiveSpotAtm}`}
+              value={manualPremiumInput}
+              onChange={e => setManualPremiumInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handlePremiumApply()}
+              style={{
+                flex: 1,
+                background: 'var(--color-bg-elevated)',
+                border: `1px solid ${useManualPremium ? '#3b82f6' : 'var(--color-border)'}`,
+                color: useManualPremium ? '#3b82f6' : 'var(--color-text-primary)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                fontFamily: 'JetBrains Mono, monospace',
+                outline: 'none',
+                width: '100%',
+              }}
+            />
+            <button
+              onClick={handlePremiumApply}
+              style={{
+                background: '#3b82f6',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Apply
+            </button>
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '0.68rem', color: useManualPremium ? '#3b82f6' : 'var(--color-text-muted)' }}>
+            {useManualPremium ? `⚡ Manual Premium Strike: ${effectivePremiumStrike}` : `Auto Premium Strike: ${effectiveSpotAtm}`}
           </div>
         </div>
       </div>
@@ -256,7 +298,7 @@ export default function SupportResistance() {
             <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#10b981' }}>
               📊 Option Premium Support & Resistance (Image 2 Format)
             </span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>BEP = (CE + PE) / 2</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>Straddle Avg = (CE + PE) / 2 per strike</span>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>

@@ -138,6 +138,8 @@ export default function Dashboard() {
     todayPnl, realizedPnl, positions,
     latestSignal, alerts, dismissAlert,
     winningTrades, losingTrades,
+    historicalDate, historicalLoading,
+    loadHistoricalData,
   } = useTradingStore();
 
   const winRate = (winningTrades + losingTrades) > 0
@@ -150,11 +152,32 @@ export default function Dashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Trading Dashboard</h1>
-          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {historicalDate && (
+              <span style={{
+                background: 'rgba(16,185,129,0.15)',
+                color: 'var(--color-profit)',
+                border: '1px solid rgba(16,185,129,0.3)',
+                borderRadius: '5px',
+                padding: '1px 7px',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+              }}>📅 Historical: {historicalDate}</span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={historicalLoading}
+            onClick={async () => {
+              try { await loadHistoricalData('2026-07-31'); } catch (e) { alert('Load failed: ' + e.message); }
+            }}
+            style={{ opacity: historicalLoading ? 0.6 : 1 }}
+          >
+            {historicalLoading ? '⏳ Loading…' : '📅 Load 31-Jul-2026'}
+          </button>
           <button className="btn btn-ghost btn-sm">🔄 Refresh</button>
           <button className="btn btn-primary btn-sm">+ New Trade</button>
         </div>

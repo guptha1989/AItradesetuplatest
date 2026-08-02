@@ -65,7 +65,7 @@ async function fetchNSEOptionChainOHLC(symbol = 'NIFTY') {
   return res.data;
 }
 
-const { calcTechfrostSR } = require('../utils/srCalculator');
+const { calcTechfrostSR, getOpenPriceData, setOpenPriceData } = require('../utils/srCalculator');
 const { replayEngine } = require('../utils/replayEngine');
 
 const { getOptionChain } = require('../api/dhan/dhanClient');
@@ -82,20 +82,26 @@ router.get('/', async (req, res) => {
     let spot = parseFloat(reqSpot);
     let chain = [];
 
-    // Fetch real live chain from Dhan API first
-    try {
-      const dhanData = await getOptionChain(symbol);
-      if (dhanData && dhanData.chain && dhanData.chain.length > 0) {
-        if (!spot) spot = dhanData.spot;
-        chain = dhanData.chain;
+    // Check if historical data is active in replayEngine first
+    if (replayEngine._historicalChain && replayEngine._historicalChain.length > 0) {
+      chain = replayEngine._historicalChain;
+      if (!spot) spot = replayEngine._historicalSpot || replayEngine.spotPrice;
+    } else {
+      // Fetch real live chain from Dhan API
+      try {
+        const dhanData = await getOptionChain(symbol);
+        if (dhanData && dhanData.chain && dhanData.chain.length > 0) {
+          if (!spot) spot = dhanData.spot;
+          chain = dhanData.chain;
+        }
+      } catch (dhanErr) {
+        logger.warn('Dhan fetch for S&R failed, trying replay/fallback:', dhanErr.message);
       }
-    } catch (dhanErr) {
-      logger.warn('Dhan fetch for S&R failed, trying replay/fallback:', dhanErr.message);
-    }
 
-    if (!chain || chain.length === 0) {
-      chain = replayEngine.getCurrentChain();
-      if (!spot) spot = replayEngine.spotPrice;
+      if (!chain || chain.length === 0) {
+        chain = replayEngine.getCurrentChain();
+        if (!spot) spot = replayEngine.spotPrice;
+      }
     }
 
     if (!spot) spot = 24383.6;
@@ -168,6 +174,38 @@ router.get('/option-chain-sr', async (req, res) => {
     res.json(result);
   } catch (err) {
     logger.error('Option chain S&R error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/sr/day-open — fetch current locked 09:16 AM Day Open prices snapshot
+router.get('/day-open', (req, res) => {
+  res.json(getOpenPriceData());
+});
+
+// POST /api/sr/lock-open — manually capture & lock current 09:16 AM Day Open prices
+router.post('/lock-open', async (req, res) => {
+  try {
+    const { symbol = 'NIFTY' } = req.body;
+    let spot, chain;
+
+    if (replayEngine._historicalChain && replayEngine._historicalChain.length > 0) {
+      chain = replayEngine._historicalChain;
+      spot = replayEngine._historicalSpot || replayEngine.spotPrice;
+    } else {
+      const dhanData = await getOptionChain(symbol);
+      spot = dhanData.spot;
+      chain = dhanData.chain;
+    }
+
+    setOpenPriceData(spot, chain, '09:16:00 AM', true);
+    res.json({
+      success: true,
+      message: '09:16 AM Day Open prices locked successfully',
+      data: getOpenPriceData(),
+    });
+  } catch (err) {
+    logger.error('Lock open price failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

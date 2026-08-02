@@ -127,7 +127,7 @@ async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', exp
       return {
         strike,
         isATM: strike === atm,
-        ceOpen: ce.average_price || ce.previous_close_price || ceLTP,
+        ceOpen: ce.open_price || ce.open || ce.ohlc?.open || ce.average_price || ce.previous_close_price || ceLTP,
         cePrev: ce.previous_close_price || ceLTP,
         ceLTP,
         ceOI,
@@ -138,7 +138,7 @@ async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', exp
         ceDelta: ce.greeks?.delta ? parseFloat(ce.greeks.delta.toFixed(3)) : 0,
         ceGamma: ce.greeks?.gamma ? parseFloat(ce.greeks.gamma.toFixed(5)) : 0,
         ceTheta: ce.greeks?.theta ? parseFloat(ce.greeks.theta.toFixed(2)) : 0,
-        peOpen: pe.average_price || pe.previous_close_price || peLTP,
+        peOpen: pe.open_price || pe.open || pe.ohlc?.open || pe.average_price || pe.previous_close_price || peLTP,
         pePrev: pe.previous_close_price || peLTP,
         peLTP,
         peOI,

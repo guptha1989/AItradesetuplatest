@@ -1,36 +1,50 @@
 /**
- * Support & Resistance Calculator — Techfrost Nifty_V6_SR PineScript exact formula port.
+ * Techfrost Nifty Options AI Trading Platform
+ * Support & Resistance Calculator — User-defined exact formulas
  *
- * Pine Script reference formulas:
- * =================================
- * ATM Strike Selection (Auto): Find strike where |CE_open - PE_open| is minimum (parity strike)
- * ATM Strike Selection (Manual): Use atmOverride directly
+ * =====================================================================
+ * ATM SELECTION (Auto):
+ *   Find the strike where | CE_open - PE_open | is MINIMUM
  *
- * SPOT S/R (Image 1):
- *   Spot_Pivot = ATM + (CE_ATM - PE_ATM)        [Synthetic Future]
- *   Spot_R1    = ATM        + CE_ATM             [ATM strike + ATM CE open]
- *   Spot_R2    = (ATM + 50) + CE_(ATM+50)
- *   Spot_R3    = (ATM +100) + CE_(ATM+100)
- *   Spot_R4    = (ATM +150) + CE_(ATM+150)
- *   Spot_R5    = (ATM +200) + CE_(ATM+200)
- *   Spot_S1    = ATM        - PE_ATM
- *   Spot_S2    = (ATM - 50) - PE_(ATM-50)
- *   Spot_S3    = (ATM -100) - PE_(ATM-100)
- *   Spot_S4    = (ATM -150) - PE_(ATM-150)
- *   Spot_S5    = (ATM -200) - PE_(ATM-200)
+ * ATM SELECTION (Manual):
+ *   Use user-supplied atmOverride value (snapped to nearest 50)
  *
- * PREMIUM S/R (Image 2) — idx 5 = selectedStrike(center), 4 = center-1, 6 = center+1, etc:
- *   pivot  = (CE_sel + PE_sel) / 2
- *   R1     = CE_sel                                           [ATM CE open]
- *   R2     = (CE_(sel-50) + PE_(sel+50)) / 2                 [ITM CE + OTM PE avg]
- *   R3     = (CE_(sel-100)+ PE_(sel+100))/ 2
- *   R4     = (CE_(sel-150)+ PE_(sel+150))/ 2
- *   R5     = (CE_(sel-200)+ PE_(sel+200))/ 2
- *   S1     = PE_sel                                           [ATM PE open]
- *   S2     = (CE_(sel+50) + PE_(sel-50)) / 2                 [OTM CE + ITM PE avg]
- *   S3     = (CE_(sel+100)+ PE_(sel-100))/ 2
- *   S4     = (CE_(sel+150)+ PE_(sel-150))/ 2
- *   S5     = (CE_(sel+200)+ PE_(sel-200))/ 2
+ * =====================================================================
+ * SPOT S/R (Image 1) — uses 9:15 AM Day Open CE premiums per strike:
+ *
+ *   Synthetic Future (Pivot):
+ *     If CE_ATM > PE_ATM → Pivot = ATM + (CE_ATM - PE_ATM)
+ *     If PE_ATM > CE_ATM → Pivot = ATM - (PE_ATM - CE_ATM)
+ *
+ *   Resistances (each strike's CE added to its own strike):
+ *     R1 = ATM        + CE_ATM
+ *     R2 = (ATM+50)   + CE_(ATM+50)
+ *     R3 = (ATM+100)  + CE_(ATM+100)
+ *     R4 = (ATM+150)  + CE_(ATM+150)
+ *     R5 = (ATM+200)  + CE_(ATM+200)
+ *
+ *   Supports (each strike minus its OWN PE premium):
+ *     S1 = ATM           - PE_ATM          (ATM strike − ATM PE)
+ *     S2 = (ATM-50)      - PE_(ATM-50)     (ATM-50 strike − its own PE)
+ *     S3 = (ATM-100)     - PE_(ATM-100)
+ *     S4 = (ATM-150)     - PE_(ATM-150)
+ *     S5 = (ATM-200)     - PE_(ATM-200)
+ *
+ * =====================================================================
+ * PREMIUM S/R (Image 2) — straddle average at each strike:
+ *
+ *   Pivot = (CE_ATM + PE_ATM) / 2
+ *   R1    = (CE_(ATM+50)  + PE_(ATM+50))  / 2
+ *   R2    = (CE_(ATM+100) + PE_(ATM+100)) / 2
+ *   R3    = (CE_(ATM+150) + PE_(ATM+150)) / 2
+ *   R4    = (CE_(ATM+200) + PE_(ATM+200)) / 2
+ *   R5    = (CE_(ATM+250) + PE_(ATM+250)) / 2
+ *   S1    = (CE_(ATM-50)  + PE_(ATM-50))  / 2
+ *   S2    = (CE_(ATM-100) + PE_(ATM-100)) / 2
+ *   S3    = (CE_(ATM-150) + PE_(ATM-150)) / 2
+ *   S4    = (CE_(ATM-200) + PE_(ATM-200)) / 2
+ *   S5    = (CE_(ATM-250) + PE_(ATM-250)) / 2
+ * =====================================================================
  */
 
 function round(n, dec = 2) {
@@ -39,20 +53,28 @@ function round(n, dec = 2) {
 }
 
 let openPriceDataStore = {
-  timestamp: '09:15:30 AM',
+  timestamp: '09:16:00 AM',
+  date: new Date().toISOString().split('T')[0],
   spotOpen: null,
   lockedAtmStrike: null,
   chainOpen: [],
+  isLocked: false,
 };
 
-function setOpenPriceData(spotOpen, chain) {
+function setOpenPriceData(spotOpen, chain, timestamp = '09:16:00 AM', forceLock = false) {
   if (!spotOpen || !chain || chain.length === 0) return;
+
+  // Don't overwrite if locked unless forceLock is true
+  if (openPriceDataStore.isLocked && !forceLock) return;
+
   const atm = Math.round(spotOpen / 50) * 50;
   openPriceDataStore = {
-    timestamp: '09:15:30 AM',
+    timestamp,
+    date: new Date().toISOString().split('T')[0],
     spotOpen,
     lockedAtmStrike: atm,
     chainOpen: chain,
+    isLocked: true,
   };
 }
 
@@ -60,7 +82,18 @@ function getOpenPriceData() {
   return openPriceDataStore;
 }
 
-function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Price', strikeStep = 50, selectedStrike, atmOverride = null }) {
+function clearOpenPriceLock() {
+  openPriceDataStore.isLocked = false;
+}
+
+function calcTechfrostSR({
+  spot = 24383.6,
+  chain = [],
+  calcBasis = 'Day Open Price',
+  strikeStep = 50,
+  selectedStrike,
+  atmOverride = null,
+}) {
   if (!spot || spot <= 0) spot = 24383.6;
 
   // Store open price data when fresh data arrives
@@ -68,13 +101,13 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
     setOpenPriceData(spot, chain);
   }
 
-  // Build sorted strike chain
-  let strikeChain = Array.isArray(chain) && chain.length > 0 ? [...chain] : [];
-
-  // Determine center/base ATM from which to generate synthetic strikes if chain is empty
+  // Rough ATM from spot (used as fallback center for chain filtering)
   const roughAtm = (atmOverride && atmOverride > 0)
     ? Math.round(atmOverride / strikeStep) * strikeStep
     : Math.round(spot / strikeStep) * strikeStep;
+
+  // Build and sort the strike chain
+  let strikeChain = Array.isArray(chain) && chain.length > 0 ? [...chain] : [];
 
   if (strikeChain.length === 0) {
     for (let i = -6; i <= 6; i++) {
@@ -82,22 +115,15 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
       const dist = strike - spot;
       const approxCeOpen = Math.max(10, 250 - dist * 0.75);
       const approxPeOpen = Math.max(10, 250 + dist * 0.75);
-      strikeChain.push({
-        strike,
-        ceOpen: approxCeOpen,
-        peOpen: approxPeOpen,
-        ceLTP: approxCeOpen,
-        peLTP: approxPeOpen,
-      });
+      strikeChain.push({ strike, ceOpen: approxCeOpen, peOpen: approxPeOpen, ceLTP: approxCeOpen, peLTP: approxPeOpen });
     }
   }
 
-  // Filter to strikes within ±400 of rough ATM and sort ascending
-  const nearChain = strikeChain.filter(r => Math.abs(r.strike - roughAtm) <= 400);
+  const nearChain = strikeChain.filter(r => Math.abs(r.strike - roughAtm) <= 500);
   if (nearChain.length > 0) strikeChain = nearChain;
   strikeChain.sort((a, b) => a.strike - b.strike);
 
-  // Helper: get base premium for a strike and type (CE/PE) based on calcBasis
+  // Helper: get base premium (CE or PE) for a strike based on calcBasis
   const getBasePremium = (strikeVal, type) => {
     const row = strikeChain.find(r => r.strike === strikeVal);
     if (!row) return 0;
@@ -119,19 +145,17 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
   };
 
   // =========================================================================
-  // ATM STRIKE SELECTION — exact Pine Script logic
-  // Manual: use atmOverride directly (rounded to strikeStep)
-  // Auto:   find strike where |CE_open - PE_open| is minimum (parity strike)
+  // ATM SELECTION
+  // Manual: snap atmOverride to nearest strikeStep
+  // Auto:   find strike with minimum | CE_open - PE_open |
   // =========================================================================
   let atmStrike;
 
   if (atmOverride && atmOverride > 0) {
-    // Manual override — snap to nearest strikeStep
     atmStrike = Math.round(atmOverride / strikeStep) * strikeStep;
   } else {
-    // Auto: Pine Script exact — find minimum |CE_open - PE_open|
     let minDiff = Infinity;
-    atmStrike = roughAtm; // fallback
+    atmStrike = roughAtm;
     for (const row of strikeChain) {
       const ceO = getBasePremium(row.strike, 'CE');
       const peO = getBasePremium(row.strike, 'PE');
@@ -145,71 +169,93 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
     }
   }
 
-  // Selected strike for Premium S/R table (Image 2)
-  const targetStrike = selectedStrike || atmStrike;
-
   // =========================================================================
-  // SPOT S/R CALCULATIONS (Image 1) — Pine Script exact formulas
+  // SPOT S/R CALCULATIONS (Reference Table Format)
+  //
+  // Synthetic Future (Pivot): ATM + (CE_ATM - PE_ATM)
+  //
+  // RESISTANCES (each level = Strike + own CE premium):
+  //   R1 = ATM           + CE_ATM          (24250 + 160.0 = 24410.0)
+  //   R2 = (ATM+50)      + CE_(ATM+50)     (24300 + 129.3 = 24429.3)
+  //   R3 = (ATM+100)     + CE_(ATM+100)    (24350 + 108.0 = 24458.0)
+  //   R4 = (ATM+150)     + CE_(ATM+150)    (24400 + 79.95 = 24479.95)
+  //   R5 = (ATM+200)     + CE_(ATM+200)    (24450 + 61.4 = 24511.4)
+  //
+  // SUPPORTS (each level = Strike - own PE premium):
+  //   S1 = ATM           - PE_ATM          (24250 - 81.4 = 24168.6)
+  //   S2 = (ATM-50)      - PE_(ATM-50)     (24200 - 50.1 = 24149.9)
+  //   S3 = (ATM-100)     - PE_(ATM-100)    (24150 - 44.05 = 24105.95)
+  //   S4 = (ATM-150)     - PE_(ATM-150)    (24100 - 33.95 = 24066.05)
+  //   S5 = (ATM-200)     - PE_(ATM-200)    (24050 - 23.55 = 24026.45)
   // =========================================================================
   const ceAtmBase = getBasePremium(atmStrike, 'CE');
   const peAtmBase = getBasePremium(atmStrike, 'PE');
   const diffAtm   = ceAtmBase - peAtmBase;
 
-  // Synthetic Future Pivot
+  // Synthetic Future: ATM + (CE - PE), handles both CE>PE and PE>CE correctly
   const spotPivot = atmStrike + diffAtm;
 
-  // Resistance levels: (ATM + n*step) + CE_(ATM + n*step)
-  const r1CeBase = getBasePremium(atmStrike,                     'CE');
-  const r2CeBase = getBasePremium(atmStrike + 1 * strikeStep,    'CE');
-  const r3CeBase = getBasePremium(atmStrike + 2 * strikeStep,    'CE');
-  const r4CeBase = getBasePremium(atmStrike + 3 * strikeStep,    'CE');
-  const r5CeBase = getBasePremium(atmStrike + 4 * strikeStep,    'CE');
+  // Resistance CE premiums — from successive OTM CE strikes
+  const r1Ce = getBasePremium(atmStrike,                  'CE'); // ATM CE
+  const r2Ce = getBasePremium(atmStrike + 1 * strikeStep, 'CE'); // ATM+50 CE
+  const r3Ce = getBasePremium(atmStrike + 2 * strikeStep, 'CE'); // ATM+100 CE
+  const r4Ce = getBasePremium(atmStrike + 3 * strikeStep, 'CE'); // ATM+150 CE
+  const r5Ce = getBasePremium(atmStrike + 4 * strikeStep, 'CE'); // ATM+200 CE
 
-  const spotR1 = atmStrike                      + r1CeBase;
-  const spotR2 = (atmStrike + 1 * strikeStep)   + r2CeBase;
-  const spotR3 = (atmStrike + 2 * strikeStep)   + r3CeBase;
-  const spotR4 = (atmStrike + 3 * strikeStep)   + r4CeBase;
-  const spotR5 = (atmStrike + 4 * strikeStep)   + r5CeBase;
+  // Each resistance = (strike for that level) + CE premium
+  const spotR1 = atmStrike                  + r1Ce;
+  const spotR2 = (atmStrike + 1*strikeStep) + r2Ce;
+  const spotR3 = (atmStrike + 2*strikeStep) + r3Ce;
+  const spotR4 = (atmStrike + 3*strikeStep) + r4Ce;
+  const spotR5 = (atmStrike + 4*strikeStep) + r5Ce;
 
-  // Support levels: (ATM - n*step) - PE_(ATM - n*step)
-  const s1PeBase = getBasePremium(atmStrike,                     'PE');
-  const s2PeBase = getBasePremium(atmStrike - 1 * strikeStep,    'PE');
-  const s3PeBase = getBasePremium(atmStrike - 2 * strikeStep,    'PE');
-  const s4PeBase = getBasePremium(atmStrike - 3 * strikeStep,    'PE');
-  const s5PeBase = getBasePremium(atmStrike - 4 * strikeStep,    'PE');
+  // Support PE premiums — from successive OTM PE strikes (going lower)
+  const s1Pe = getBasePremium(atmStrike,                  'PE'); // ATM PE
+  const s2Pe = getBasePremium(atmStrike - 1 * strikeStep, 'PE'); // ATM-50 PE
+  const s3Pe = getBasePremium(atmStrike - 2 * strikeStep, 'PE'); // ATM-100 PE
+  const s4Pe = getBasePremium(atmStrike - 3 * strikeStep, 'PE'); // ATM-150 PE
+  const s5Pe = getBasePremium(atmStrike - 4 * strikeStep, 'PE'); // ATM-200 PE
 
-  const spotS1 = atmStrike                      - s1PeBase;
-  const spotS2 = (atmStrike - 1 * strikeStep)   - s2PeBase;
-  const spotS3 = (atmStrike - 2 * strikeStep)   - s3PeBase;
-  const spotS4 = (atmStrike - 3 * strikeStep)   - s4PeBase;
-  const spotS5 = (atmStrike - 4 * strikeStep)   - s5PeBase;
+  // Each support = (strike for that level) - PE premium
+  const spotS1 = atmStrike                  - s1Pe;
+  const spotS2 = (atmStrike - 1*strikeStep) - s2Pe;
+  const spotS3 = (atmStrike - 2*strikeStep) - s3Pe;
+  const spotS4 = (atmStrike - 3*strikeStep) - s4Pe;
+  const spotS5 = (atmStrike - 4*strikeStep) - s5Pe;
 
-  // =========================================================================
-  // PREMIUM S/R CALCULATIONS (Image 2) — Pine Script exact formulas
-  // Array index logic: idx5=selectedStrike, idx4=sel-1, idx6=sel+1
-  // R levels: CE_(sel-n) + PE_(sel+n) / 2  (ITM CE + OTM PE)
-  // S levels: CE_(sel+n) + PE_(sel-n) / 2  (OTM CE + ITM PE)
-  // =========================================================================
-  const ceBaseSel = getBasePremium(targetStrike, 'CE');
-  const peBaseSel = getBasePremium(targetStrike, 'PE');
-  const premiumPivot = (ceBaseSel + peBaseSel) / 2.0;
-
-  // Premium Resistances — ITM CE (going lower strikes) + OTM PE (going higher strikes)
-  const premR1 = ceBaseSel;
-  const premR2 = (getBasePremium(targetStrike - 1 * strikeStep, 'CE') + getBasePremium(targetStrike + 1 * strikeStep, 'PE')) / 2.0;
-  const premR3 = (getBasePremium(targetStrike - 2 * strikeStep, 'CE') + getBasePremium(targetStrike + 2 * strikeStep, 'PE')) / 2.0;
-  const premR4 = (getBasePremium(targetStrike - 3 * strikeStep, 'CE') + getBasePremium(targetStrike + 3 * strikeStep, 'PE')) / 2.0;
-  const premR5 = (getBasePremium(targetStrike - 4 * strikeStep, 'CE') + getBasePremium(targetStrike + 4 * strikeStep, 'PE')) / 2.0;
-
-  // Premium Supports — OTM CE (going higher strikes) + ITM PE (going lower strikes)
-  const premS1 = peBaseSel;
-  const premS2 = (getBasePremium(targetStrike + 1 * strikeStep, 'CE') + getBasePremium(targetStrike - 1 * strikeStep, 'PE')) / 2.0;
-  const premS3 = (getBasePremium(targetStrike + 2 * strikeStep, 'CE') + getBasePremium(targetStrike - 2 * strikeStep, 'PE')) / 2.0;
-  const premS4 = (getBasePremium(targetStrike + 3 * strikeStep, 'CE') + getBasePremium(targetStrike - 3 * strikeStep, 'PE')) / 2.0;
-  const premS5 = (getBasePremium(targetStrike + 4 * strikeStep, 'CE') + getBasePremium(targetStrike - 4 * strikeStep, 'PE')) / 2.0;
 
   // =========================================================================
-  // STRUCTURED ROWS — Image 1: Spot S/R Table (4-column format)
+  // PREMIUM S/R CALCULATIONS (Image 2)
+  // Uses selectedStrike if provided (allows independent manual override for Premium S/R)
+  // Each level = (CE + PE) / 2 at that strike (straddle average)
+  // Pivot at Premium Base Strike, Resistances above, Supports below
+  // =========================================================================
+  const premiumBaseStrike = (selectedStrike && selectedStrike > 0)
+    ? Math.round(selectedStrike / strikeStep) * strikeStep
+    : atmStrike;
+
+  const straddleAvg = (strikeVal) => {
+    const ce = getBasePremium(strikeVal, 'CE');
+    const pe = getBasePremium(strikeVal, 'PE');
+    return { ce, pe, avg: (ce + pe) / 2.0 };
+  };
+
+  const pAtm = straddleAvg(premiumBaseStrike);
+  const pR1  = straddleAvg(premiumBaseStrike + 1 * strikeStep);
+  const pR2  = straddleAvg(premiumBaseStrike + 2 * strikeStep);
+  const pR3  = straddleAvg(premiumBaseStrike + 3 * strikeStep);
+  const pR4  = straddleAvg(premiumBaseStrike + 4 * strikeStep);
+  const pR5  = straddleAvg(premiumBaseStrike + 5 * strikeStep);
+  const pS1  = straddleAvg(premiumBaseStrike - 1 * strikeStep);
+  const pS2  = straddleAvg(premiumBaseStrike - 2 * strikeStep);
+  const pS3  = straddleAvg(premiumBaseStrike - 3 * strikeStep);
+  const pS4  = straddleAvg(premiumBaseStrike - 4 * strikeStep);
+  const pS5  = straddleAvg(premiumBaseStrike - 5 * strikeStep);
+
+  // =========================================================================
+  // STRUCTURED ROWS — Image 1: Spot S/R Table
+  // Chosen Strike = where the CE/PE premium is taken from
+  // Value = ATM base ± that premium
   // =========================================================================
   const spotRows = [
     {
@@ -222,163 +268,163 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
     {
       metric: 'Synthetic Future (Pivot)',
       chosenStrike: `${atmStrike} (ATM)`,
-      optionBase: `Diff: ${diffAtm >= 0 ? '+' : ''}${round(diffAtm, 1)}`,
+      optionBase: `CE${diffAtm >= 0 ? '+' : ''}${round(diffAtm, 1)} (${diffAtm >= 0 ? 'CE>PE' : 'PE>CE'})`,
       value: round(spotPivot, 1),
       type: 'pivot',
     },
     {
       metric: 'Resistance 1 (R1)',
       chosenStrike: `${atmStrike} CE`,
-      optionBase: `${round(r1CeBase, 1)}`,
+      optionBase: `${round(r1Ce, 1)}`,
       value: round(spotR1, 1),
       type: 'resistance',
     },
     {
       metric: 'Resistance 2 (R2)',
       chosenStrike: `${atmStrike + 1 * strikeStep} CE`,
-      optionBase: `${round(r2CeBase, 1)}`,
+      optionBase: `${round(r2Ce, 1)}`,
       value: round(spotR2, 1),
       type: 'resistance',
     },
     {
       metric: 'Resistance 3 (R3)',
       chosenStrike: `${atmStrike + 2 * strikeStep} CE`,
-      optionBase: `${round(r3CeBase, 1)}`,
+      optionBase: `${round(r3Ce, 1)}`,
       value: round(spotR3, 1),
       type: 'resistance',
     },
     {
       metric: 'Resistance 4 (R4)',
       chosenStrike: `${atmStrike + 3 * strikeStep} CE`,
-      optionBase: `${round(r4CeBase, 1)}`,
+      optionBase: `${round(r4Ce, 1)}`,
       value: round(spotR4, 1),
       type: 'resistance',
     },
     {
       metric: 'Resistance 5 (R5)',
       chosenStrike: `${atmStrike + 4 * strikeStep} CE`,
-      optionBase: `${round(r5CeBase, 1)}`,
+      optionBase: `${round(r5Ce, 1)}`,
       value: round(spotR5, 1),
       type: 'resistance',
     },
     {
       metric: 'Support 1 (S1)',
       chosenStrike: `${atmStrike} PE`,
-      optionBase: `${round(s1PeBase, 1)}`,
+      optionBase: `${round(s1Pe, 1)}`,
       value: round(spotS1, 1),
       type: 'support',
     },
     {
       metric: 'Support 2 (S2)',
       chosenStrike: `${atmStrike - 1 * strikeStep} PE`,
-      optionBase: `${round(s2PeBase, 1)}`,
+      optionBase: `${round(s2Pe, 1)}`,
       value: round(spotS2, 1),
       type: 'support',
     },
     {
       metric: 'Support 3 (S3)',
       chosenStrike: `${atmStrike - 2 * strikeStep} PE`,
-      optionBase: `${round(s3PeBase, 1)}`,
+      optionBase: `${round(s3Pe, 1)}`,
       value: round(spotS3, 1),
       type: 'support',
     },
     {
       metric: 'Support 4 (S4)',
       chosenStrike: `${atmStrike - 3 * strikeStep} PE`,
-      optionBase: `${round(s4PeBase, 1)}`,
+      optionBase: `${round(s4Pe, 1)}`,
       value: round(spotS4, 1),
       type: 'support',
     },
     {
       metric: 'Support 5 (S5)',
       chosenStrike: `${atmStrike - 4 * strikeStep} PE`,
-      optionBase: `${round(s5PeBase, 1)}`,
+      optionBase: `${round(s5Pe, 1)}`,
       value: round(spotS5, 1),
       type: 'support',
     },
   ];
 
+
   // =========================================================================
-  // STRUCTURED ROWS — Image 2: Premium S/R Table (4-column format)
-  // R2 Chosen Strike display: ITM CE (sel-50 CE) / OTM PE (sel+50 PE)
-  // S2 Chosen Strike display: OTM CE (sel+50 CE) / ITM PE (sel-50 PE)
+  // STRUCTURED ROWS — Image 2: Premium S/R Table
+  // Pivot = ATM straddle avg, R levels above ATM, S levels below ATM
   // =========================================================================
   const premiumRows = [
     {
-      metric: 'Selected Strike (Base)',
-      chosenStrike: `${targetStrike}`,
-      optionBase: `CE:${round(ceBaseSel, 1)} | PE:${round(peBaseSel, 1)}`,
-      value: round(premiumPivot, 1),
+      metric: 'Base Strike Pivot (Straddle Avg)',
+      chosenStrike: `${premiumBaseStrike}`,
+      optionBase: `CE:${round(pAtm.ce, 1)} + PE:${round(pAtm.pe, 1)}`,
+      value: round(pAtm.avg, 1),
       type: 'pivot',
     },
     {
-      metric: 'R1 Premium (CE Base)',
-      chosenStrike: `${targetStrike} CE`,
-      optionBase: `${round(ceBaseSel, 1)}`,
-      value: round(premR1, 1),
+      metric: 'R1 Premium (+50)',
+      chosenStrike: `${premiumBaseStrike + 1 * strikeStep}`,
+      optionBase: `CE:${round(pR1.ce, 1)} + PE:${round(pR1.pe, 1)}`,
+      value: round(pR1.avg, 1),
       type: 'resistance',
     },
     {
-      metric: 'R2 Premium (ITM Avg 1)',
-      chosenStrike: `${targetStrike - 1 * strikeStep} CE / ${targetStrike + 1 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike - 1 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike + 1 * strikeStep, 'PE'), 1)})`,
-      value: round(premR2, 1),
+      metric: 'R2 Premium (+100)',
+      chosenStrike: `${premiumBaseStrike + 2 * strikeStep}`,
+      optionBase: `CE:${round(pR2.ce, 1)} + PE:${round(pR2.pe, 1)}`,
+      value: round(pR2.avg, 1),
       type: 'resistance',
     },
     {
-      metric: 'R3 Premium (ITM Avg 2)',
-      chosenStrike: `${targetStrike - 2 * strikeStep} CE / ${targetStrike + 2 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike - 2 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike + 2 * strikeStep, 'PE'), 1)})`,
-      value: round(premR3, 1),
+      metric: 'R3 Premium (+150)',
+      chosenStrike: `${premiumBaseStrike + 3 * strikeStep}`,
+      optionBase: `CE:${round(pR3.ce, 1)} + PE:${round(pR3.pe, 1)}`,
+      value: round(pR3.avg, 1),
       type: 'resistance',
     },
     {
-      metric: 'R4 Premium (ITM Avg 3)',
-      chosenStrike: `${targetStrike - 3 * strikeStep} CE / ${targetStrike + 3 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike - 3 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike + 3 * strikeStep, 'PE'), 1)})`,
-      value: round(premR4, 1),
+      metric: 'R4 Premium (+200)',
+      chosenStrike: `${premiumBaseStrike + 4 * strikeStep}`,
+      optionBase: `CE:${round(pR4.ce, 1)} + PE:${round(pR4.pe, 1)}`,
+      value: round(pR4.avg, 1),
       type: 'resistance',
     },
     {
-      metric: 'R5 Premium (ITM Avg 4)',
-      chosenStrike: `${targetStrike - 4 * strikeStep} CE / ${targetStrike + 4 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike - 4 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike + 4 * strikeStep, 'PE'), 1)})`,
-      value: round(premR5, 1),
+      metric: 'R5 Premium (+250)',
+      chosenStrike: `${premiumBaseStrike + 5 * strikeStep}`,
+      optionBase: `CE:${round(pR5.ce, 1)} + PE:${round(pR5.pe, 1)}`,
+      value: round(pR5.avg, 1),
       type: 'resistance',
     },
     {
-      metric: 'S1 Premium (PE Base)',
-      chosenStrike: `${targetStrike} PE`,
-      optionBase: `${round(peBaseSel, 1)}`,
-      value: round(premS1, 1),
+      metric: 'S1 Premium (-50)',
+      chosenStrike: `${premiumBaseStrike - 1 * strikeStep}`,
+      optionBase: `CE:${round(pS1.ce, 1)} + PE:${round(pS1.pe, 1)}`,
+      value: round(pS1.avg, 1),
       type: 'support',
     },
     {
-      metric: 'S2 Premium (OTM Avg 1)',
-      chosenStrike: `${targetStrike + 1 * strikeStep} CE / ${targetStrike - 1 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike + 1 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike - 1 * strikeStep, 'PE'), 1)})`,
-      value: round(premS2, 1),
+      metric: 'S2 Premium (-100)',
+      chosenStrike: `${premiumBaseStrike - 2 * strikeStep}`,
+      optionBase: `CE:${round(pS2.ce, 1)} + PE:${round(pS2.pe, 1)}`,
+      value: round(pS2.avg, 1),
       type: 'support',
     },
     {
-      metric: 'S3 Premium (OTM Avg 2)',
-      chosenStrike: `${targetStrike + 2 * strikeStep} CE / ${targetStrike - 2 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike + 2 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike - 2 * strikeStep, 'PE'), 1)})`,
-      value: round(premS3, 1),
+      metric: 'S3 Premium (-150)',
+      chosenStrike: `${premiumBaseStrike - 3 * strikeStep}`,
+      optionBase: `CE:${round(pS3.ce, 1)} + PE:${round(pS3.pe, 1)}`,
+      value: round(pS3.avg, 1),
       type: 'support',
     },
     {
-      metric: 'S4 Premium (OTM Avg 3)',
-      chosenStrike: `${targetStrike + 3 * strikeStep} CE / ${targetStrike - 3 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike + 3 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike - 3 * strikeStep, 'PE'), 1)})`,
-      value: round(premS4, 1),
+      metric: 'S4 Premium (-200)',
+      chosenStrike: `${premiumBaseStrike - 4 * strikeStep}`,
+      optionBase: `CE:${round(pS4.ce, 1)} + PE:${round(pS4.pe, 1)}`,
+      value: round(pS4.avg, 1),
       type: 'support',
     },
     {
-      metric: 'S5 Premium (OTM Avg 4)',
-      chosenStrike: `${targetStrike + 4 * strikeStep} CE / ${targetStrike - 4 * strikeStep} PE`,
-      optionBase: `Avg(${round(getBasePremium(targetStrike + 4 * strikeStep, 'CE'), 1)} + ${round(getBasePremium(targetStrike - 4 * strikeStep, 'PE'), 1)})`,
-      value: round(premS5, 1),
+      metric: 'S5 Premium (-250)',
+      chosenStrike: `${premiumBaseStrike - 5 * strikeStep}`,
+      optionBase: `CE:${round(pS5.ce, 1)} + PE:${round(pS5.pe, 1)}`,
+      value: round(pS5.avg, 1),
       type: 'support',
     },
   ];
@@ -386,7 +432,6 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
   return {
     calcBasis,
     atmStrike,
-    targetStrike,
     spot,
     openPriceData: openPriceDataStore,
     spotRows,
@@ -397,12 +442,12 @@ function calcTechfrostSR({ spot = 24383.6, chain = [], calcBasis = 'Day Open Pri
       s1: round(spotS1), s2: round(spotS2), s3: round(spotS3), s4: round(spotS4), s5: round(spotS5),
     },
     premiumLevels: {
-      pivot: round(premiumPivot),
-      r1: round(premR1), r2: round(premR2), r3: round(premR3), r4: round(premR4), r5: round(premR5),
-      s1: round(premS1), s2: round(premS2), s3: round(premS3), s4: round(premS4), s5: round(premS5),
+      pivot: round(pAtm.avg),
+      r1: round(pR1.avg), r2: round(pR2.avg), r3: round(pR3.avg), r4: round(pR4.avg), r5: round(pR5.avg),
+      s1: round(pS1.avg), s2: round(pS2.avg), s3: round(pS3.avg), s4: round(pS4.avg), s5: round(pS5.avg),
     },
     calculatedAt: new Date().toISOString(),
   };
 }
 
-module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, round };
+module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, clearOpenPriceLock, round };

@@ -24,6 +24,7 @@ const optionChainRoutes = require('./routes/optionChain');
 const srRoutes = require('./routes/sr');
 const trendingOIRoutes = require('./routes/trendingOI');
 const replayRoutes = require('./routes/replay');
+const historicalRoutes = require('./routes/historical');
 
 // ─── App Setup ───────────────────────────────────────────────
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/chain', optionChainRoutes);
 app.use('/api/sr', srRoutes);
 app.use('/api/trending-oi', trendingOIRoutes);
 app.use('/api/replay', replayRoutes);
+app.use('/api/historical', historicalRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -117,16 +119,37 @@ cron.schedule('* * * * *', async () => {
 });
 
 /**
+ * 09:16 AM IST daily: Capture & lock 09:16 AM Day Open prices for Spot & Option Chain
+ */
+cron.schedule('16 9 * * 1-5', async () => {
+  try {
+    const { getOptionChain } = require('./api/dhan/dhanClient');
+    const { setOpenPriceData } = require('./utils/srCalculator');
+    logger.info('[09:16 AM IST] Capturing & locking 09:16 AM Day Open prices...');
+    const chainData = await getOptionChain('NIFTY');
+    if (chainData && chainData.chain && chainData.chain.length > 0) {
+      setOpenPriceData(chainData.spot, chainData.chain, '09:16:00 AM', true);
+      logger.info(`✅ 09:16 AM Day Open prices locked: Spot=${chainData.spot}, ATM=${chainData.atm}, Strikes=${chainData.chain.length}`);
+      wsServer.broadcast('ALERT_FEED', {
+        level: 'INFO',
+        message: `🔒 09:16 AM Day Open prices locked (Spot: ${chainData.spot})`,
+      });
+    }
+  } catch (err) {
+    logger.error('Failed to capture 09:16 AM Day Open prices:', err.message);
+  }
+}, { timezone: 'Asia/Kolkata' });
+
+/**
  * 15:35 IST daily: EOD summary
  */
-cron.schedule('5 10 * * 1-5', async () => {
-  // 15:35 IST = 10:05 UTC
+cron.schedule('35 15 * * 1-5', async () => {
   logger.info('Running EOD summary...');
   wsServer.broadcast('ALERT_FEED', {
     level: 'INFO',
     message: 'Market closed. EOD summary generating...',
   });
-});
+}, { timezone: 'Asia/Kolkata' });
 
 // Periodic memory garbage collection guard
 setInterval(() => {
