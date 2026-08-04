@@ -190,12 +190,38 @@ export default function DhanDashboardView() {
         </div>
       </div>
 
-      {/* 2. Dual Top Banners: 09:16 AM IST and 09:17 AM IST Locked CE Pairs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+      {/* 2. Triple Top Banners: 09:15 AM Day Open, 09:16 AM IST, and 09:17 AM IST Locked CE Pairs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '12px' }}>
+        {/* 09:15 AM Day Open CE Pair Banner */}
+        {parameters.pair0915 && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(59,130,246,0.12) 100%)',
+            border: '1px solid rgba(16,185,129,0.4)',
+            borderRadius: '10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#a7f3d0' }}>
+                ⭐ 09:15 AM DAY OPEN CE PAIR
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                Strikes: <strong style={{ color: '#34d399' }}>{parameters.pair0915.strikeA} CE</strong> (₹{parameters.pair0915.openA}) & <strong style={{ color: '#34d399' }}>{parameters.pair0915.strikeB} CE</strong> (₹{parameters.pair0915.openB})
+              </div>
+            </div>
+            <span style={{ background: 'rgba(16,185,129,0.2)', color: '#a7f3d0', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700 }}>
+              09:15 AM Open
+            </span>
+          </div>
+        )}
+
         {/* 09:16 AM CE Pair Banner */}
         {parameters.pair0916 && (
           <div style={{
-            padding: '12px 18px',
+            padding: '12px 16px',
             background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(59,130,246,0.12) 100%)',
             border: '1px solid rgba(234,179,8,0.4)',
             borderRadius: '10px',
@@ -221,7 +247,7 @@ export default function DhanDashboardView() {
         {/* 09:17 AM CE Pair Banner */}
         {parameters.pair0917 && (
           <div style={{
-            padding: '12px 18px',
+            padding: '12px 16px',
             background: 'linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(16,185,129,0.12) 100%)',
             border: '1px solid rgba(168,85,247,0.4)',
             borderRadius: '10px',
@@ -235,7 +261,7 @@ export default function DhanDashboardView() {
                 ⭐ 09:17 AM IST LOCKED CE PAIR
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                Strikes: <strong style={{ color: '#34d399' }}>{parameters.pair0917.strikeA} CE</strong> (₹{parameters.pair0917.openA}) & <strong style={{ color: '#34d399' }}>{parameters.pair0917.strikeB} CE</strong> (₹{parameters.pair0917.openB})
+                Strikes: <strong style={{ color: '#c084fc' }}>{parameters.pair0917.strikeA} CE</strong> (₹{parameters.pair0917.openA}) & <strong style={{ color: '#c084fc' }}>{parameters.pair0917.strikeB} CE</strong> (₹{parameters.pair0917.openB})
               </div>
             </div>
             <span style={{ background: 'rgba(168,85,247,0.2)', color: '#e9d5ff', border: '1px solid rgba(168,85,247,0.4)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -487,6 +513,7 @@ export default function DhanDashboardView() {
                 processedContracts.map((c) => {
                   const isPositive = c.change >= 0;
                   const chgColor = isPositive ? '#10b981' : '#ef4444';
+                  const is15 = c.is0915CEPair && c.option === 'CE';
                   const is16 = c.is0916CEPair && c.option === 'CE';
                   const is17 = c.is0917CEPair && c.option === 'CE';
 
@@ -494,12 +521,16 @@ export default function DhanDashboardView() {
                     <tr key={c.id} style={{
                       borderBottom: '1px solid rgba(255,255,255,0.04)',
                       fontSize: '0.82rem',
-                      background: is16 ? 'rgba(234, 179, 8, 0.12)' : is17 ? 'rgba(168, 85, 247, 0.12)' : 'transparent',
+                      background: is15 ? 'rgba(16, 185, 129, 0.12)' : is16 ? 'rgba(234, 179, 8, 0.12)' : is17 ? 'rgba(168, 85, 247, 0.12)' : 'transparent',
                     }}>
                       
                       {/* Trade Info */}
                       <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                        {is16 ? (
+                        {is15 ? (
+                          <span style={{ background: '#10b981', color: '#000', borderRadius: '4px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                            ⭐ 09:15 CE Pair
+                          </span>
+                        ) : is16 ? (
                           <span style={{ background: '#eab308', color: '#000', borderRadius: '4px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
                             ⭐ 09:16 CE Pair
                           </span>

@@ -86,9 +86,12 @@ function clearOpenPriceLock() {
   openPriceDataStore.isLocked = false;
 }
 
-function findBothCEPairs(chain = [], spotInput) {
+function findTripleCEPairs(chain = [], spotInput) {
   if (!chain || chain.length === 0) {
-    return { pair0916: null, pair0917: null, pairsMap0916: {}, pairsMap0917: {} };
+    return {
+      pair0915: null, pair0916: null, pair0917: null,
+      pairsMap0915: {}, pairsMap0916: {}, pairsMap0917: {},
+    };
   }
 
   const targetChain = (openPriceDataStore.chainOpen && openPriceDataStore.chainOpen.length > 0)
@@ -98,7 +101,27 @@ function findBothCEPairs(chain = [], spotInput) {
   const currentSpot = spotInput || openPriceDataStore.spotOpen || 24587.65;
   const atm = Math.round(currentSpot / 50) * 50; // 24600
 
-  // 1. Calculate 09:16 AM CE Pair
+  // 1. Calculate 09:15 AM IST (Day Open) CE Pair (ATM - 150 & ATM - 100)
+  const strikeA15 = atm - 150; // 24450
+  const strikeB15 = atm - 100; // 24500
+  const strikes15 = [strikeA15, strikeB15];
+  const rowA15 = targetChain.find(r => r.strike === strikeA15) || {};
+  const rowB15 = targetChain.find(r => r.strike === strikeB15) || {};
+  const openA15 = round(rowA15.ceOpen || rowA15.ceLTP || 188.40, 2);
+  const openB15 = round(rowB15.ceOpen || rowB15.ceLTP || 158.10, 2);
+  const pairsMap0915 = {};
+  strikes15.forEach(s => { pairsMap0915[s] = true; });
+
+  const pair0915 = {
+    strikeA: strikeA15,
+    strikeB: strikeB15,
+    openA: openA15,
+    openB: openB15,
+    diff: round(Math.abs(openA15 - openB15), 2),
+    lockedTime: '09:15:00 AM IST (Day Open)',
+  };
+
+  // 2. Calculate 09:16 AM IST CE Pair
   const ceList16 = targetChain.filter(r => Math.abs(r.strike - atm) <= 250).map(r => ({
     strike: r.strike,
     ceOpen: r.ceOpen || r.ceLTP || 0,
@@ -135,7 +158,7 @@ function findBothCEPairs(chain = [], spotInput) {
     };
   }
 
-  // 2. Enforce 09:17 AM CE Pair: 24550 CE and 24600 CE (exact user specification)
+  // 3. Enforce 09:17 AM IST CE Pair: 24550 CE and 24600 CE (exact user specification)
   const strikeA17 = atm - 50; // 24550
   const strikeB17 = atm;      // 24600
   const strikes17 = [strikeA17, strikeB17];
@@ -159,10 +182,22 @@ function findBothCEPairs(chain = [], spotInput) {
   };
 
   return {
+    pair0915,
     pair0916,
     pair0917,
+    pairsMap0915,
     pairsMap0916,
     pairsMap0917,
+  };
+}
+
+function findBothCEPairs(chain = [], spotInput) {
+  const triple = findTripleCEPairs(chain, spotInput);
+  return {
+    pair0916: triple.pair0916,
+    pair0917: triple.pair0917,
+    pairsMap0916: triple.pairsMap0916,
+    pairsMap0917: triple.pairsMap0917,
   };
 }
 
@@ -530,4 +565,4 @@ function calcTechfrostSR({
   };
 }
 
-module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, clearOpenPriceLock, findBothCEPairs, round };
+module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, clearOpenPriceLock, findBothCEPairs, findTripleCEPairs, round };

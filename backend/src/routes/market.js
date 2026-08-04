@@ -117,8 +117,8 @@ router.get('/all-contracts', async (req, res) => {
       spot = ocRes.spot || spot;
     }
 
-    const { findBothCEPairs } = require('../utils/srCalculator');
-    const { pair0916, pair0917, pairsMap0916, pairsMap0917 } = findBothCEPairs(chainData, spot);
+    const { findTripleCEPairs } = require('../utils/srCalculator');
+    const { pair0915, pair0916, pair0917, pairsMap0915, pairsMap0916, pairsMap0917 } = findTripleCEPairs(chainData, spot);
 
     const todayStr = new Date().toISOString().split('T')[0];
     const activeExpiries = expiries.filter(e => e >= todayStr);
@@ -131,6 +131,7 @@ router.get('/all-contracts', async (req, res) => {
     chainData.forEach((r) => {
       if (filterStrikeNum && r.strike !== filterStrikeNum) return;
 
+      const isCE15 = !!pairsMap0915[r.strike];
       const isCE16 = !!pairsMap0916[r.strike];
       const isCE17 = !!pairsMap0917[r.strike];
 
@@ -160,6 +161,7 @@ router.get('/all-contracts', async (req, res) => {
           oi: r.ceOI || 0,
           oiChange: r.ceOIChange || 0,
           iv: r.ceIV || 0,
+          is0915CEPair: isCE15,
           is0916CEPair: isCE16,
           is0917CEPair: isCE17,
         });
@@ -191,6 +193,7 @@ router.get('/all-contracts', async (req, res) => {
           oi: r.peOI || 0,
           oiChange: r.peOIChange || 0,
           iv: r.peIV || 0,
+          is0915CEPair: false,
           is0916CEPair: false,
           is0917CEPair: false,
         });
@@ -207,6 +210,7 @@ router.get('/all-contracts', async (req, res) => {
         underlyingValue: parseFloat(spot.toFixed(2)),
         symbol,
         expiry: selectedExpiry,
+        pair0915,
         pair0916,
         pair0917,
       },
@@ -244,8 +248,8 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
     const chainData = ocRes.chain || [];
     const spot = ocRes.spot || 24614.90;
 
-    const { findBothCEPairs } = require('../utils/srCalculator');
-    const { pair0916, pair0917, pairsMap0916, pairsMap0917 } = findBothCEPairs(chainData, spot);
+    const { findTripleCEPairs } = require('../utils/srCalculator');
+    const { pair0915, pair0916, pair0917, pairsMap0915, pairsMap0916, pairsMap0917 } = findTripleCEPairs(chainData, spot);
 
     const todayStr = new Date().toISOString().split('T')[0];
     let expiries = ocRes.expiries || ['2026-08-04', '2026-08-11', '2026-08-18', '2026-08-25', '2026-09-01'];
@@ -258,6 +262,7 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
 
     chainData.forEach((r) => {
       if (filterStrikeNum && r.strike !== filterStrikeNum) return;
+      const isCE15 = !!pairsMap0915[r.strike];
       const isCE16 = !!pairsMap0916[r.strike];
       const isCE17 = !!pairsMap0917[r.strike];
 
@@ -288,6 +293,7 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
           oi: r.ceOI || 0,
           oiChange: r.ceOIChange || 0,
           iv: r.ceIV || 0,
+          is0915CEPair: isCE15,
           is0916CEPair: isCE16,
           is0917CEPair: isCE17,
           securityId: r.ceSecurityId || null,
@@ -321,6 +327,7 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
           oi: r.peOI || 0,
           oiChange: r.peOIChange || 0,
           iv: r.peIV || 0,
+          is0915CEPair: false,
           is0916CEPair: false,
           is0917CEPair: false,
           securityId: r.peSecurityId || null,
@@ -339,6 +346,7 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
         underlyingValue: parseFloat(spot.toFixed(2)),
         symbol,
         expiry: targetExpiry,
+        pair0915,
         pair0916,
         pair0917,
       },
