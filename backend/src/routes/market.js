@@ -117,8 +117,8 @@ router.get('/all-contracts', async (req, res) => {
       spot = ocRes.spot || spot;
     }
 
-    const { find0916CEPairs } = require('../utils/srCalculator');
-    const { pairedStrikes, pairsMap, firstCEPair, timestamp: lockedTime } = find0916CEPairs(chainData);
+    const { findBothCEPairs } = require('../utils/srCalculator');
+    const { pair0916, pair0917, pairsMap0916, pairsMap0917 } = findBothCEPairs(chainData, spot);
 
     const todayStr = new Date().toISOString().split('T')[0];
     const activeExpiries = expiries.filter(e => e >= todayStr);
@@ -131,7 +131,8 @@ router.get('/all-contracts', async (req, res) => {
     chainData.forEach((r) => {
       if (filterStrikeNum && r.strike !== filterStrikeNum) return;
 
-      const isCEPairStrike = !!pairsMap[r.strike];
+      const isCE16 = !!pairsMap0916[r.strike];
+      const isCE17 = !!pairsMap0917[r.strike];
 
       // CALL (CE) Contract
       if (r.ceLTP !== undefined && (optionType === 'ALL' || optionType === 'CE')) {
@@ -159,7 +160,8 @@ router.get('/all-contracts', async (req, res) => {
           oi: r.ceOI || 0,
           oiChange: r.ceOIChange || 0,
           iv: r.ceIV || 0,
-          is0916CEPair: isCEPairStrike,
+          is0916CEPair: isCE16,
+          is0917CEPair: isCE17,
         });
       }
 
@@ -190,6 +192,7 @@ router.get('/all-contracts', async (req, res) => {
           oiChange: r.peOIChange || 0,
           iv: r.peIV || 0,
           is0916CEPair: false,
+          is0917CEPair: false,
         });
       }
     });
@@ -204,9 +207,8 @@ router.get('/all-contracts', async (req, res) => {
         underlyingValue: parseFloat(spot.toFixed(2)),
         symbol,
         expiry: selectedExpiry,
-        lockedTime,
-        cePairStrikes: pairedStrikes,
-        firstCEPair,
+        pair0916,
+        pair0917,
       },
       expiries: activeExpiries.length > 0 ? activeExpiries : expiries,
       totalContracts: contracts.length,

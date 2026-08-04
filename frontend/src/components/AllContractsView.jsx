@@ -190,43 +190,60 @@ export default function AllContractsView() {
         </button>
       </div>
 
-      {/* 09:17 AM Locked First CE Pair Highlight Banner */}
-      {parameters.firstCEPair && (
-        <div style={{
-          padding: '12px 18px',
-          background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(59,130,246,0.12) 100%)',
-          border: '1px solid rgba(234,179,8,0.4)',
-          borderRadius: '10px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '1.2rem' }}>⭐</span>
+      {/* Dual Top Banners: 09:16 AM IST and 09:17 AM IST Locked CE Pairs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '14px' }}>
+        {/* 09:16 AM CE Pair Banner */}
+        {parameters.pair0916 && (
+          <div style={{
+            padding: '12px 18px',
+            background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(59,130,246,0.12) 100%)',
+            border: '1px solid rgba(234,179,8,0.4)',
+            borderRadius: '10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
             <div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#fef08a' }}>
-                09:17 AM IST LOCKED FIRST CE PAIR
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#fef08a' }}>
+                ⭐ 09:16 AM IST LOCKED CE PAIR
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                Matched Strikes: <strong style={{ color: '#38bdf8' }}>{parameters.firstCEPair.strikeA} CE</strong> (Open: ₹{parameters.firstCEPair.openA}) & <strong style={{ color: '#38bdf8' }}>{parameters.firstCEPair.strikeB} CE</strong> (Open: ₹{parameters.firstCEPair.openB}) | Diff: ₹{parameters.firstCEPair.diff}
+                Strikes: <strong style={{ color: '#38bdf8' }}>{parameters.pair0916.strikeA} CE</strong> (₹{parameters.pair0916.openA}) & <strong style={{ color: '#38bdf8' }}>{parameters.pair0916.strikeB} CE</strong> (₹{parameters.pair0916.openB})
               </div>
             </div>
+            <span style={{ background: 'rgba(234,179,8,0.2)', color: '#fef08a', border: '1px solid rgba(234,179,8,0.4)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700 }}>
+              09:16 AM IST
+            </span>
           </div>
-          <span style={{
-            background: 'rgba(234,179,8,0.2)',
-            color: '#fef08a',
-            border: '1px solid rgba(234,179,8,0.4)',
-            borderRadius: '6px',
-            padding: '4px 10px',
-            fontSize: '0.72rem',
-            fontWeight: 700,
+        )}
+
+        {/* 09:17 AM CE Pair Banner */}
+        {parameters.pair0917 && (
+          <div style={{
+            padding: '12px 18px',
+            background: 'linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(16,185,129,0.12) 100%)',
+            border: '1px solid rgba(168,85,247,0.4)',
+            borderRadius: '10px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '10px',
           }}>
-            🔒 09:17 AM IST Locked
-          </span>
-        </div>
-      )}
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#e9d5ff' }}>
+                ⭐ 09:17 AM IST LOCKED CE PAIR
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                Strikes: <strong style={{ color: '#34d399' }}>{parameters.pair0917.strikeA} CE</strong> (₹{parameters.pair0917.openA}) & <strong style={{ color: '#34d399' }}>{parameters.pair0917.strikeB} CE</strong> (₹{parameters.pair0917.openB})
+              </div>
+            </div>
+            <span style={{ background: 'rgba(168,85,247,0.2)', color: '#e9d5ff', border: '1px solid rgba(168,85,247,0.4)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.7rem', fontWeight: 700 }}>
+              09:17 AM IST
+            </span>
+          </div>
+        )}
+      </div>
 
       <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-text-primary)', margin: '4px 0 0 0' }}>
         Contract Parameters
@@ -474,27 +491,26 @@ export default function AllContractsView() {
                 processedContracts.map((c) => {
                   const isPositive = c.change >= 0;
                   const chgColor = isPositive ? '#10b981' : '#ef4444';
-                  const isPinnedPair = c.is0916CEPair && c.option === 'CE';
+                  const is16 = c.is0916CEPair && c.option === 'CE';
+                  const is17 = c.is0917CEPair && c.option === 'CE';
 
                   return (
                     <tr key={c.id} style={{
                       borderBottom: '1px solid rgba(255,255,255,0.04)',
                       fontSize: '0.82rem',
-                      background: isPinnedPair ? 'rgba(234, 179, 8, 0.12)' : 'transparent',
+                      background: is16 ? 'rgba(234, 179, 8, 0.12)' : is17 ? 'rgba(168, 85, 247, 0.12)' : 'transparent',
                     }}>
                       
                       {/* Trade Info */}
                       <td style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                        {isPinnedPair ? (
-                          <span style={{
-                            background: '#eab308',
-                            color: '#000',
-                            borderRadius: '4px',
-                            padding: '2px 6px',
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            whiteSpace: 'nowrap',
-                          }}>⭐ 09:17 CE Pair</span>
+                        {is16 ? (
+                          <span style={{ background: '#eab308', color: '#000', borderRadius: '4px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                            ⭐ 09:16 CE Pair
+                          </span>
+                        ) : is17 ? (
+                          <span style={{ background: '#a855f7', color: '#fff', borderRadius: '4px', padding: '2px 6px', fontSize: '0.68rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                            ⭐ 09:17 CE Pair
+                          </span>
                         ) : (
                           <span style={{
                             display: 'inline-flex',
