@@ -67,22 +67,33 @@ function VolumeCell({ value, pct }) {
 }
 
 export default function OptionChainView() {
-  const { spot } = useTradingStore();
+  const { spot, optionChain: storeChain, lastChainUpdate } = useTradingStore();
   const [chain, setChain] = useState([]);
   const [prevChain, setPrevChain] = useState({});
   const [loading, setLoading] = useState(false);
   const [expiry, setExpiry] = useState('');
-  const [timeframe, setTimeframe] = useState(5);
+  const [timeframe, setTimeframe] = useState(3);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [filterNearATM, setFilterNearATM] = useState(true);
   const timerRef = useRef(null);
+
+  // Sync real-time option chain from Zustand WebSocket feed
+  useEffect(() => {
+    if (storeChain && storeChain.length > 0) {
+      const prev = {};
+      chain.forEach(r => { prev[r.strike] = r; });
+      setPrevChain(prev);
+      setChain(storeChain);
+      if (lastChainUpdate) setLastUpdate(lastChainUpdate);
+    }
+  }, [storeChain, lastChainUpdate]);
 
   const fetchChain = async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/chain`).then(r => r.json());
       if (res.chain && Array.isArray(res.chain)) {
-        // Save previous for volume change calculation
         const prev = {};
         chain.forEach(r => { prev[r.strike] = r; });
         setPrevChain(prev);
@@ -97,18 +108,16 @@ export default function OptionChainView() {
     }
   };
 
-  // Auto-refresh based on timeframe
+  // Fetch chain on mount / timeframe change (real-time updates arrive via WebSocket CHAIN_FEED)
   useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (autoRefresh) {
-      fetchChain();
-      timerRef.current = setInterval(fetchChain, 5000);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [timeframe, autoRefresh]);
+    fetchChain();
+  }, [timeframe]);
 
   const atm = spot ? Math.round(spot / 50) * 50 : null;
-  const maxOI = Math.max(...chain.map(r => Math.max(r.ceOI || 0, r.peOI || 0)), 1);
+  const displayedChain = filterNearATM && atm && chain.length > 35
+    ? chain.filter(r => Math.abs(r.strike - atm) <= 750)
+    : chain;
+  const maxOI = Math.max(...displayedChain.map(r => Math.max(r.ceOI || 0, r.peOI || 0)), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -124,6 +133,14 @@ export default function OptionChainView() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Near ATM Filter Toggle */}
+          <button
+            className={`btn btn-sm ${filterNearATM ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setFilterNearATM(!filterNearATM)}
+            title="Focus on strikes near ATM"
+          >
+            {filterNearATM ? '🎯 Near ATM (±15)' : '🌐 All Strikes'}
+          </button>
           {/* Timeframe selector */}
           <div style={{ display: 'flex', gap: '2px', border: '1px solid var(--color-border)', borderRadius: '8px', overflow: 'hidden', padding: '2px' }}>
             {TIMEFRAMES.map(tf => (
@@ -213,7 +230,7 @@ export default function OptionChainView() {
                 </tr>
               </thead>
               <tbody>
-                {chain.map((row, i) => {
+                {displayedChain.map((row, i) => {
                   const isATM = row.strike === atm;
                   const prev = prevChain[row.strike] || {};
 

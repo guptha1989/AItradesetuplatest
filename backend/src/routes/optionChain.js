@@ -8,6 +8,8 @@ const logger = require('../utils/logger');
 
 const { replayEngine } = require('../utils/replayEngine');
 
+const { liveEngine } = require('../api/dhan/liveEngine');
+
 let chainCache = { key: null, data: null, expiresAt: 0 };
 
 // GET /api/chain — fetch full option chain for nearest expiry
@@ -15,6 +17,12 @@ router.get('/', async (req, res) => {
   try {
     const expiry = req.query.expiry || '';
     const symbol = req.query.symbol || 'NIFTY';
+
+    // Prefer liveEngine if live & updated
+    const liveData = liveEngine.getLatestData();
+    if (liveEngine.isLive && liveData.chain && liveData.chain.length > 0) {
+      return res.json(liveData);
+    }
     const cacheKey = `${symbol}_${expiry}`;
 
     if (chainCache.key === cacheKey && chainCache.data && Date.now() < chainCache.expiresAt) {

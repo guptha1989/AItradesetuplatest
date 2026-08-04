@@ -98,8 +98,11 @@ function DailyRow({ day, onClick, selected }) {
   );
 }
 
+import { useTradingStore } from '../store/tradingStore';
+
 // ─── Main Component ───────────────────────────────────────────
 export default function TradeJournal() {
+  const { positions, todayPnl: livePnl, recentOrders } = useTradingStore();
   const [trades, setTrades] = useState([]);
   const [pnlSummary, setPnlSummary] = useState(null);
   const [monthlyHistory, setMonthlyHistory] = useState([]);

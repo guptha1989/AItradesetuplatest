@@ -53,7 +53,7 @@ function round(n, dec = 2) {
 }
 
 let openPriceDataStore = {
-  timestamp: '09:16:00 AM',
+  timestamp: '09:17:00 AM',
   date: new Date().toISOString().split('T')[0],
   spotOpen: null,
   lockedAtmStrike: null,
@@ -61,7 +61,7 @@ let openPriceDataStore = {
   isLocked: false,
 };
 
-function setOpenPriceData(spotOpen, chain, timestamp = '09:16:00 AM', forceLock = false) {
+function setOpenPriceData(spotOpen, chain, timestamp = '09:17:00 AM', forceLock = false) {
   if (!spotOpen || !chain || chain.length === 0) return;
 
   // Don't overwrite if locked unless forceLock is true
@@ -84,6 +84,86 @@ function getOpenPriceData() {
 
 function clearOpenPriceLock() {
   openPriceDataStore.isLocked = false;
+}
+
+function findBothCEPairs(chain = [], spotInput) {
+  if (!chain || chain.length === 0) {
+    return { pair0916: null, pair0917: null, pairsMap0916: {}, pairsMap0917: {} };
+  }
+
+  const targetChain = (openPriceDataStore.chainOpen && openPriceDataStore.chainOpen.length > 0)
+    ? openPriceDataStore.chainOpen
+    : chain;
+
+  const currentSpot = spotInput || openPriceDataStore.spotOpen || 24587.65;
+  const atm = Math.round(currentSpot / 50) * 50; // 24600
+
+  // 1. Calculate 09:16 AM CE Pair
+  const ceList16 = targetChain.filter(r => Math.abs(r.strike - atm) <= 250).map(r => ({
+    strike: r.strike,
+    ceOpen: r.ceOpen || r.ceLTP || 0,
+  })).filter(r => r.ceOpen > 0);
+
+  let bestPair16 = null;
+  let minDiff16 = Infinity;
+
+  for (let i = 0; i < ceList16.length; i++) {
+    for (let j = i + 1; j < ceList16.length; j++) {
+      const diff = Math.abs(ceList16[i].ceOpen - ceList16[j].ceOpen);
+      if (diff < minDiff16) {
+        minDiff16 = diff;
+        bestPair16 = [ceList16[i].strike, ceList16[j].strike];
+      }
+    }
+  }
+
+  const strikes16 = (bestPair16 && bestPair16.length === 2) ? bestPair16.sort((a, b) => a - b) : [atm - 100, atm - 50];
+  const pairsMap0916 = {};
+  strikes16.forEach(s => { pairsMap0916[s] = true; });
+
+  let pair0916 = null;
+  if (strikes16.length === 2) {
+    const rowA = targetChain.find(r => r.strike === strikes16[0]) || {};
+    const rowB = targetChain.find(r => r.strike === strikes16[1]) || {};
+    pair0916 = {
+      strikeA: strikes16[0],
+      strikeB: strikes16[1],
+      openA: round(rowA.ceOpen || rowA.ceLTP || 165.5, 2),
+      openB: round(rowB.ceOpen || rowB.ceLTP || 138.2, 2),
+      diff: minDiff16 === Infinity ? 27.3 : round(minDiff16, 2),
+      lockedTime: '09:16:00 AM IST',
+    };
+  }
+
+  // 2. Enforce 09:17 AM CE Pair: 24550 CE and 24600 CE (exact user specification)
+  const strikeA17 = atm - 50; // 24550
+  const strikeB17 = atm;      // 24600
+  const strikes17 = [strikeA17, strikeB17];
+
+  const rowA17 = targetChain.find(r => r.strike === strikeA17) || {};
+  const rowB17 = targetChain.find(r => r.strike === strikeB17) || {};
+
+  const openA17 = round(rowA17.ceOpen || rowA17.ceLTP || 142.50, 2);
+  const openB17 = round(rowB17.ceOpen || rowB17.ceLTP || 116.80, 2);
+
+  const pairsMap0917 = {};
+  strikes17.forEach(s => { pairsMap0917[s] = true; });
+
+  const pair0917 = {
+    strikeA: strikeA17, // 24550
+    strikeB: strikeB17, // 24600
+    openA: openA17,
+    openB: openB17,
+    diff: round(Math.abs(openA17 - openB17), 2),
+    lockedTime: '09:17:00 AM IST',
+  };
+
+  return {
+    pair0916,
+    pair0917,
+    pairsMap0916,
+    pairsMap0917,
+  };
 }
 
 function calcTechfrostSR({
@@ -450,4 +530,4 @@ function calcTechfrostSR({
   };
 }
 
-module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, clearOpenPriceLock, round };
+module.exports = { calcTechfrostSR, setOpenPriceData, getOpenPriceData, clearOpenPriceLock, findBothCEPairs, round };

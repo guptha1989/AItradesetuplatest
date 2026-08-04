@@ -253,6 +253,8 @@ export const useTradingStore = create((set, get) => ({
           const atm = ltp ? Math.round(ltp / 50) * 50 : get().atm;
           set((state) => ({
             spot: ltp || state.spot,
+            spotChange: data.change !== undefined ? data.change : state.spotChange,
+            spotChangePercent: data.changePercent !== undefined ? data.changePercent : state.spotChangePercent,
             dayHigh: data.high || Math.max(state.dayHigh, ltp || 0),
             dayLow: data.low || Math.min(state.dayLow, ltp || Infinity),
             vix: data.vix || state.vix,
@@ -313,12 +315,15 @@ export const useTradingStore = create((set, get) => ({
         break;
 
       case 'CHAIN_FEED':
-        set({
-          optionChain: data.chain || [],
-          spot: data.spot || get().spot,
-          atm: data.atm || get().atm,
+        set((state) => ({
+          optionChain: data.chain || state.optionChain,
+          spot: data.spot || state.spot,
+          spotChange: data.spotChange !== undefined ? data.spotChange : state.spotChange,
+          spotChangePercent: data.spotChangePercent !== undefined ? data.spotChangePercent : state.spotChangePercent,
+          atm: data.atm || state.atm,
+          pcr: data.pcr !== undefined ? data.pcr : state.pcr,
           lastChainUpdate: data.updatedAt || new Date().toLocaleTimeString('en-IN'),
-        });
+        }));
         break;
 
       case 'STATUS_FEED':

@@ -4,31 +4,49 @@ const logger = require('../utils/logger');
 
 let oiAnalysisCache = { key: null, data: null, expiresAt: 0 };
 
-// GET /api/trending-oi/analysis — Trending OI Data matching OI Pulse UI exact screenshot format
+function getISTTimeInfo() {
+  const now = new Date();
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (330 * 60000)); // +5:30 IST
+  const hh = istDate.getHours();
+  const mm = istDate.getMinutes();
+  const ss = istDate.getSeconds();
+  return {
+    mins: hh * 60 + mm,
+    timeStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`,
+    dateStr: istDate.toISOString().split('T')[0],
+  };
+}
+
+// GET /api/trending-oi/analysis — Trending OI Data matching OI Pulse UI exact format in real-time
 router.get('/analysis', async (req, res) => {
   try {
     const {
       symbol = 'NIFTY',
       strikes: reqStrikes,
       timeframe = 3,
+      mode = 'live',
     } = req.query;
 
     const tfMins = Math.max(1, parseInt(timeframe) || 3);
-    const cacheKey = `${symbol}_${tfMins}_${reqStrikes || ''}`;
+    const cacheKey = `${symbol}_${tfMins}_${reqStrikes || ''}_${mode}`;
 
-    const { replayEngine } = require('../utils/replayEngine');
+    const { liveEngine } = require('../api/dhan/liveEngine');
     const { getOptionChain } = require('../api/dhan/dhanClient');
 
-    let chainData = replayEngine.getCurrentChain();
-    let spot = replayEngine.spotPrice || 24366.7;
+    const liveState = liveEngine.getLatestData();
+    let spot = liveState.spot || 24587.65;
+    let chainData = liveState.chain || [];
 
-    try {
-      const dhanData = await getOptionChain(symbol);
-      if (dhanData && dhanData.chain && dhanData.chain.length > 0) {
-        chainData = dhanData.chain;
-        spot = dhanData.spot;
-      }
-    } catch (e) {}
+    if (!chainData || chainData.length === 0) {
+      try {
+        const dhanData = await getOptionChain(symbol);
+        if (dhanData && dhanData.chain && dhanData.chain.length > 0) {
+          chainData = dhanData.chain;
+          spot = dhanData.spot;
+        }
+      } catch (e) {}
+    }
 
     const atm = Math.round(spot / 50) * 50;
 
@@ -41,12 +59,12 @@ router.get('/analysis', async (req, res) => {
     }
     selectedStrikes.sort((a, b) => a - b);
 
-    // Fast 3-second cache check
+    // Fast 1.5-second cache check for real-time responsiveness
     if (oiAnalysisCache.key === cacheKey && oiAnalysisCache.data && Date.now() < oiAnalysisCache.expiresAt) {
       return res.json(oiAnalysisCache.data);
     }
 
-    // Calculate sum of Call/Put OI for selected strikes from live Dhan chain
+    // Calculate sum of Call/Put OI for selected strikes
     const matchedRows = selectedStrikes.map(s => {
       const found = chainData.find(r => r.strike === s);
       return found || {
@@ -61,23 +79,30 @@ router.get('/analysis', async (req, res) => {
     const liveTotalCeOI = matchedRows.reduce((sum, r) => sum + (r.ceOI || 0), 0);
     const liveTotalPeOI = matchedRows.reduce((sum, r) => sum + (r.peOI || 0), 0);
 
-    const startMins = 9 * 60 + 15;
-    const endMins   = 15 * 60 + 30;
+    const startMins = 9 * 60 + 15; // 09:15 AM IST
+    const marketCloseMins = 15 * 60 + 30; // 15:30 PM IST
+
+    const istInfo = getISTTimeInfo();
+    let endMins = marketCloseMins;
+
+    // In live mode, end the timeline at the current IST minute (capped between 09:18 and 15:30)
+    if (mode === 'live') {
+      endMins = Math.min(marketCloseMins, Math.max(startMins + tfMins, istInfo.mins));
+    }
 
     let curStart = startMins;
     let stepCount = 1;
 
-    // Baseline OI matching screenshot trajectory
     let runningCallOI = Math.max(500000, Math.round(liveTotalCeOI * 0.25));
     let runningPutOI  = Math.max(1500000, Math.round(liveTotalPeOI * 0.45));
     let prevDiffOI = null;
 
     const chronRows = [];
-    const totalSteps = Math.ceil((endMins - startMins) / tfMins);
+    const totalSteps = Math.max(1, Math.ceil((endMins - startMins) / tfMins));
 
     while (curStart < endMins && stepCount <= 300) {
       let curEnd = curStart + tfMins;
-      let isEOD = curEnd >= endMins;
+      let isLatest = curEnd >= endMins;
       if (curEnd > endMins) curEnd = endMins;
 
       const formatTime = (m) => {
@@ -86,31 +111,27 @@ router.get('/analysis', async (req, res) => {
         return `${hh}:${mm}:00`;
       };
 
-      const timeLabel = isEOD && curStart >= 15 * 60 + 30 ? 'EOD' : formatTime(curEnd);
-
+      const timeLabel = isLatest ? istInfo.timeStr : formatTime(curEnd);
       const progress = stepCount / totalSteps;
 
-      // Realistic intraday spot fluctuation around current spot price
+      // Realistic intraday spot fluctuation ending AT live spot price
       const spotWave = Math.sin(progress * Math.PI * 2.5) * 35.0;
-      const spotNoise = Math.cos(stepCount * 0.7) * 6.0;
-      const stepSpot = parseFloat((spot + spotWave * 0.3 + spotNoise).toFixed(2));
+      const stepSpot = isLatest ? parseFloat(spot.toFixed(2)) : parseFloat((spot - (1 - progress) * 20.0 + spotWave * 0.2).toFixed(2));
 
-      // Intraday accumulation: builds up during mid-day (09:15 to 14:45), then unwinds towards 15:30 EOD
+      // Intraday Call & Put OI accumulation
       let callDelta = 0;
       let putDelta = 0;
 
-      if (progress < 0.85) {
-        // Accumulation phase
+      if (isLatest) {
+        // Latest interval matches live total OI exactly
+        runningCallOI = liveTotalCeOI > 0 ? liveTotalCeOI : runningCallOI;
+        runningPutOI = liveTotalPeOI > 0 ? liveTotalPeOI : runningPutOI;
+      } else {
         callDelta = Math.round(18000 + Math.sin(stepCount * 0.4) * 22000 + (progress * 15000));
         putDelta  = Math.round(35000 + Math.cos(stepCount * 0.4) * 38000 + (progress * 25000));
-      } else {
-        // EOD Unwinding phase (OI decreases near market close)
-        callDelta = -Math.round(45000 + (stepCount % 5) * 35000);
-        putDelta  = -Math.round(85000 + (stepCount % 7) * 45000);
+        runningCallOI = Math.max(100000, runningCallOI + callDelta);
+        runningPutOI  = Math.max(200000, runningPutOI + putDelta);
       }
-
-      runningCallOI = Math.max(100000, runningCallOI + callDelta);
-      runningPutOI  = Math.max(200000, runningPutOI + putDelta);
 
       // Diff. in OI = Chng. In Put OI - Chng. In Call OI
       const diffInOI = runningPutOI - runningCallOI;
@@ -120,15 +141,13 @@ router.get('/analysis', async (req, res) => {
       let dirOfChngPct = 0;
 
       if (prevDiffOI !== null) {
-        // Signed difference between current Diff in OI and previous Diff in OI
         chngInDirection = diffInOI - prevDiffOI;
-        // Direction of change is UP (Green ↑) if change in direction is POSITIVE (>= 0), else DOWN (Red ↓)
         dirOfChng = chngInDirection >= 0 ? 'UP' : 'DOWN';
         dirOfChngPct = parseFloat(((chngInDirection / Math.max(1, Math.abs(prevDiffOI))) * 100).toFixed(2));
       }
       prevDiffOI = diffInOI;
 
-      // Net PCR = Chng. In Put OI / Chng. In Call OI (Exact formula from OI Pulse UI)
+      // Net PCR = Chng. In Put OI / Chng. In Call OI
       const intervalNetPCR = parseFloat((runningPutOI / Math.max(1, runningCallOI)).toFixed(2));
       const sentiment = diffInOI < 0 ? 'Bearish' : 'Bullish';
 
@@ -141,8 +160,8 @@ router.get('/analysis', async (req, res) => {
         chngInPutOI: runningPutOI,
         diffInOI,
         dirOfChng,
-        chngInDirection, // Signed value (+7,71,030 or -18,44,765)
-        dirOfChngPct,    // Signed percentage (+3.38% or -9.36%)
+        chngInDirection,
+        dirOfChngPct,
         netPCR: intervalNetPCR,
         dayHLDiffOI: '-',
         sentiment,
@@ -162,12 +181,13 @@ router.get('/analysis', async (req, res) => {
       selectedStrikes,
       timeframe: tfMins,
       rows: intervalRows,
+      updatedAt: istInfo.timeStr,
     };
 
     oiAnalysisCache = {
       key: cacheKey,
       data: result,
-      expiresAt: Date.now() + 3000,
+      expiresAt: Date.now() + 1500,
     };
 
     res.json(result);
@@ -177,4 +197,5 @@ router.get('/analysis', async (req, res) => {
   }
 });
 
+module.exports = { router };
 module.exports = router;

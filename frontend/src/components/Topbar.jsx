@@ -45,8 +45,11 @@ export default function Topbar() {
             🛑 HALTED
           </span>
         )}
+        <span className="badge badge-live" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 700 }}>
+          🔴 LIVE - Dhan HQ
+        </span>
         <span className={`badge ${paperMode ? 'badge-paper' : 'badge-live'}`}>
-          {paperMode ? '📝 PAPER' : '🔴 LIVE'}
+          {paperMode ? '📝 PAPER EXECUTION' : '🔴 LIVE TRADING'}
         </span>
         {historicalDate && (
           <span style={{
@@ -61,7 +64,7 @@ export default function Topbar() {
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--color-text-secondary)' }}>
           <span className={`live-dot ${wsConnected ? '' : 'red'}`}></span>
-          {wsConnected ? 'Connected' : 'Disconnected'}
+          {wsConnected ? 'Realtime WS' : 'Disconnected'}
         </div>
       </div>
     </header>

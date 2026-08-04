@@ -29,10 +29,28 @@ dhanHttp.interceptors.response.use(
 let optionChainCache = { data: null, expiresAt: 0 };
 let cachedExpiry = { date: '2026-08-04', expiresAt: 0 };
 
+function getNextTuesdayExpiry() {
+  const d = new Date();
+  const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (330 * 60000));
+  const day = istDate.getDay();
+  let diff = (2 - day + 7) % 7;
+  const hh = istDate.getHours();
+  const mm = istDate.getMinutes();
+  if (day === 2 && (hh > 15 || (hh === 15 && mm >= 30))) {
+    diff = 7;
+  }
+  istDate.setDate(istDate.getDate() + diff);
+  return istDate.toISOString().split('T')[0];
+}
+
 async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
   if (cachedExpiry.date && Date.now() < cachedExpiry.expiresAt) {
     return cachedExpiry.date;
   }
+  const defaultTuesday = getNextTuesdayExpiry();
+  const todayStr = new Date().toISOString().split('T')[0];
+
   try {
     const expRes = await dhanHttp.post('/optionchain/expirylist', {
       UnderlyingScrip: underlyingSymbol === 'BANKNIFTY' ? 25 : 13,
@@ -40,13 +58,16 @@ async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
     });
     const list = expRes.data?.data || expRes.data || expRes;
     if (Array.isArray(list) && list.length > 0) {
-      cachedExpiry = { date: list[0], expiresAt: Date.now() + 600000 };
-      return list[0];
+      // Filter out past expired dates
+      const activeList = list.filter(exp => exp >= todayStr);
+      const chosen = activeList.length > 0 ? activeList[0] : defaultTuesday;
+      cachedExpiry = { date: chosen, expiresAt: Date.now() + 600000 };
+      return chosen;
     }
   } catch (e) {
-    logger.warn('Failed to fetch Dhan expiry list, using fallback 2026-08-04:', e.message);
+    logger.warn(`Failed to fetch Dhan expiry list, using Tuesday fallback ${defaultTuesday}:`, e.message);
   }
-  return '2026-08-04';
+  return defaultTuesday;
 }
 
 /**
@@ -60,10 +81,10 @@ async function getOptionChain(underlyingSymbol = 'NIFTY', expiryDate) {
     return optionChainCache.data;
   }
 
-  // Trigger background refresh so callers are never blocked
-  refreshOptionChainCacheBackground(underlyingSymbol, expiryDate);
+  // Await refresh so callers get live Dhan HQ data
+  await refreshOptionChainCacheBackground(underlyingSymbol, expiryDate);
 
-  // Return existing cache if available
+  // Return fresh cache
   if (optionChainCache.data) {
     return optionChainCache.data;
   }
@@ -151,6 +172,8 @@ async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', exp
         peTheta: pe.greeks?.theta ? parseFloat(pe.greeks.theta.toFixed(2)) : 0,
         bep: parseFloat(((ceLTP + peLTP) / 2).toFixed(2)),
         buildup: { ce: ceBuildup, pe: peBuildup },
+        ceSecurityId: ce.security_id || null,
+        peSecurityId: pe.security_id || null,
       };
     });
 
@@ -163,7 +186,10 @@ async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', exp
 
     optionChainCache = { data: result, expiresAt: Date.now() + 10000 };
   } catch (err) {
-    logger.warn('getOptionChain API unavailable, using fallback:', err.message);
+    logger.warn('getOptionChain API rate limited or unavailable, retaining live cache:', err.message);
+    if (optionChainCache.data) {
+      optionChainCache.expiresAt = Date.now() + 6000;
+    }
   }
 }
 
@@ -291,5 +317,7 @@ module.exports = {
   getOrderById,
   getTrades,
   getNextWeeklyExpiry,
+  getRealDhanExpiry,
+  getNextTuesdayExpiry,
   tradingDaysToExpiry,
 };

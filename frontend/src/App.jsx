@@ -8,6 +8,8 @@ import Dashboard from './components/Dashboard';
 import SignalPanel from './components/SignalPanel';
 import TradeJournal from './components/TradeJournal';
 import OptionChainView from './components/OptionChainView';
+import AllContractsView from './components/AllContractsView';
+import DhanDashboardView from './components/DhanDashboardView';
 import TrendingOI from './components/TrendingOI';
 import SupportResistance from './components/SupportResistance';
 
@@ -20,13 +22,15 @@ function App() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard':  return <Dashboard />;
-      case 'chain':      return <OptionChainView />;
-      case 'signals':    return <SignalPanel />;
-      case 'journal':    return <TradeJournal />;
-      case 'trending':   return <TrendingOI />;
-      case 'sr':         return <SupportResistance />;
-      default:           return <Dashboard />;
+      case 'dashboard':       return <Dashboard />;
+      case 'dhan-dashboard':  return <DhanDashboardView />;
+      case 'all-contracts':   return <AllContractsView />;
+      case 'chain':           return <OptionChainView />;
+      case 'signals':         return <SignalPanel />;
+      case 'journal':         return <TradeJournal />;
+      case 'trending':        return <TrendingOI />;
+      case 'sr':              return <SupportResistance />;
+      default:                return <Dashboard />;
     }
   };
 

@@ -11,6 +11,7 @@ const { testConnection } = require('./config/db');
 const logger = require('./utils/logger');
 const { wsServer } = require('./websocket/wsServer');
 const { dhanWS } = require('./api/dhan/dhanWS');
+const { liveEngine } = require('./api/dhan/liveEngine');
 const { riskManager } = require('./oms/riskManager');
 const { generateSignal } = require('./api/gemini/signalAnalyzer');
 const { getNextWeeklyExpiry } = require('./api/dhan/dhanClient');
@@ -119,24 +120,24 @@ cron.schedule('* * * * *', async () => {
 });
 
 /**
- * 09:16 AM IST daily: Capture & lock 09:16 AM Day Open prices for Spot & Option Chain
+ * 09:17 AM IST daily: Capture & lock 09:17 AM Day Open prices for Spot & Option Chain
  */
-cron.schedule('16 9 * * 1-5', async () => {
+cron.schedule('17 9 * * 1-5', async () => {
   try {
     const { getOptionChain } = require('./api/dhan/dhanClient');
     const { setOpenPriceData } = require('./utils/srCalculator');
-    logger.info('[09:16 AM IST] Capturing & locking 09:16 AM Day Open prices...');
+    logger.info('[09:17 AM IST] Capturing & locking 09:17 AM Day Open prices...');
     const chainData = await getOptionChain('NIFTY');
     if (chainData && chainData.chain && chainData.chain.length > 0) {
-      setOpenPriceData(chainData.spot, chainData.chain, '09:16:00 AM', true);
-      logger.info(`✅ 09:16 AM Day Open prices locked: Spot=${chainData.spot}, ATM=${chainData.atm}, Strikes=${chainData.chain.length}`);
+      setOpenPriceData(chainData.spot, chainData.chain, '09:17:00 AM', true);
+      logger.info(`✅ 09:17 AM Day Open prices locked: Spot=${chainData.spot}, ATM=${chainData.atm}, Strikes=${chainData.chain.length}`);
       wsServer.broadcast('ALERT_FEED', {
         level: 'INFO',
-        message: `🔒 09:16 AM Day Open prices locked (Spot: ${chainData.spot})`,
+        message: `🔒 09:17 AM Day Open prices locked (Spot: ${chainData.spot})`,
       });
     }
   } catch (err) {
-    logger.error('Failed to capture 09:16 AM Day Open prices:', err.message);
+    logger.error('Failed to capture 09:17 AM Day Open prices:', err.message);
   }
 }, { timezone: 'Asia/Kolkata' });
 
@@ -178,16 +179,15 @@ async function start() {
     }
   }
 
-  // 3. Connect Dhan WebSocket (if API credentials present)
+  // 3. Connect Dhan WebSocket & Live Engine (if API credentials present)
   if (config.dhan.clientId && config.dhan.accessToken) {
     dhanWS.connect();
+    dhanWS.subscribe([{ exchangeSegment: 'IDX_I', securityId: '13' }]); // Nifty 50 Index
 
-    // Subscribe to Nifty index and near-expiry options
+    liveEngine.start();
+
     const expiry = getNextWeeklyExpiry();
     logger.info(`Next weekly expiry: ${expiry}`);
-
-    // Note: securityIds for specific strikes must be fetched from Dhan's security master
-    // dhanWS.subscribe([{ exchangeSegment: 'NSE_EQ', securityId: '13' }]); // Nifty 50
   } else {
     logger.warn('⚠️  Dhan API credentials not configured. Running in data-less mode.');
   }

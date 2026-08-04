@@ -19,11 +19,12 @@ export default function TrendingOI() {
   const currentSpot = spot || 24383.6;
   const currentAtm  = atm || Math.round(currentSpot / 50) * 50;
 
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
   const [symbol, setSymbol] = useState('NIFTY');
   const [mode, setMode] = useState('live');
-  const [selectedDate, setSelectedDate] = useState('2026-07-31');
+  const [selectedDate, setSelectedDate] = useState(getTodayStr());
   const [expiryDate, setExpiryDate] = useState('04-Aug-2026');
-  const [timeframe, setTimeframe] = useState(5);
+  const [timeframe, setTimeframe] = useState(3);
   const [showGraphView, setShowGraphView] = useState(false);
 
   const [selectedStrikes, setSelectedStrikes] = useState([
@@ -257,8 +258,7 @@ export default function TrendingOI() {
 
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
             Underlying: <strong style={{ color: 'var(--color-text-primary)' }}>{symbol}</strong> at{' '}
-            <strong style={{ color: 'var(--color-text-primary)' }}>{currentSpot.toFixed(2)}</strong>, Chg:{' '}
-            <span style={{ color: '#10b981', fontWeight: 700 }}>249.35 (0.67%)</span> as on 31 Jul 2026, 22:45:00 IST
+            <strong style={{ color: 'var(--color-text-primary)' }}>{currentSpot.toFixed(2)}</strong> as on {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
         </div>
       </div>

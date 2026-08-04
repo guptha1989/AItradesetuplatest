@@ -139,7 +139,7 @@ export default function Dashboard() {
     latestSignal, alerts, dismissAlert,
     winningTrades, losingTrades,
     historicalDate, historicalLoading,
-    loadHistoricalData,
+    loadHistoricalData, fetchLiveData,
   } = useTradingStore();
 
   const winRate = (winningTrades + losingTrades) > 0
@@ -178,7 +178,7 @@ export default function Dashboard() {
           >
             {historicalLoading ? '⏳ Loading…' : '📅 Load 31-Jul-2026'}
           </button>
-          <button className="btn btn-ghost btn-sm">🔄 Refresh</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => fetchLiveData()}>🔄 Refresh</button>
           <button className="btn btn-primary btn-sm">+ New Trade</button>
         </div>
       </div>

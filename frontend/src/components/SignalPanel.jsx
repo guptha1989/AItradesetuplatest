@@ -108,6 +108,8 @@ function SignalCard({ signal }) {
   );
 }
 
+const API_BASE = 'http://localhost:3001/api';
+
 export default function SignalPanel() {
   const { signals, latestSignal, clearSignals } = useTradingStore();
 
@@ -120,7 +122,18 @@ export default function SignalPanel() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="btn btn-ghost btn-sm" onClick={clearSignals}>Clear All</button>
-          <button className="btn btn-primary btn-sm">⚡ Generate Now</button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={async () => {
+              try {
+                await fetch(`${API_BASE}/signals/generate`, { method: 'POST' });
+              } catch (e) {
+                console.error('Trigger signal error:', e);
+              }
+            }}
+          >
+            ⚡ Generate Now
+          </button>
         </div>
       </div>
 

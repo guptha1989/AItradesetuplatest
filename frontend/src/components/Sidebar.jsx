@@ -5,6 +5,8 @@ const navSections = [
     title: 'Trading',
     items: [
       { id: 'dashboard', icon: '⚡', label: 'Dashboard' },
+      { id: 'dhan-dashboard', icon: '🎯', label: 'Dhan Live Chain' },
+      { id: 'all-contracts', icon: '📜', label: 'All Contracts' },
       { id: 'chain',     icon: '📊', label: 'Option Chain' },
       { id: 'trending',  icon: '📈', label: 'Trending OI' },
       { id: 'signals',   icon: '🤖', label: 'AI Signals' },
