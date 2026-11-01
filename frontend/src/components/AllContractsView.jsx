@@ -8,12 +8,12 @@ export default function AllContractsView() {
 
   const [symbol, setSymbol] = useState('NIFTY');
   const [instrumentType, setInstrumentType] = useState('Index Options');
-  const [selectedExpiry, setSelectedExpiry] = useState('');
+  const [selectedExpiry, setSelectedExpiry] = useState('05-Nov-2026');
   const [optionType, setOptionType] = useState('ALL');
   const [strikeFilter, setStrikeFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [expiries, setExpiries] = useState(['04-Aug-2026', '11-Aug-2026', '18-Aug-2026', '25-Aug-2026', '01-Sep-2026']);
+  const [expiries, setExpiries] = useState(['05-Nov-2026', '12-Nov-2026', '26-Nov-2026', '31-Dec-2026']);
   const [contracts, setContracts] = useState([]);
   const [parameters, setParameters] = useState({
     tickSize: '0.05',

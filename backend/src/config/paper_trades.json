@@ -1,0 +1,96 @@
+{
+  "orders": [
+    {
+      "id": "ORD_PAP_101",
+      "time": "30 Oct 2026, 02:45 PM",
+      "symbol": "NIFTY 05NOV26 24200 CE",
+      "underlying": "NIFTY",
+      "strike": 24200,
+      "type": "CE",
+      "action": "BUY",
+      "qty": 50,
+      "price": 142.5,
+      "orderType": "MARKET",
+      "status": "FILLED",
+      "mode": "PAPER"
+    },
+    {
+      "id": "ORD_PAP_102",
+      "time": "30 Oct 2026, 01:15 PM",
+      "symbol": "BANKNIFTY 05NOV26 51800 PE",
+      "underlying": "BANKNIFTY",
+      "strike": 51800,
+      "type": "PE",
+      "action": "BUY",
+      "qty": 30,
+      "price": 285,
+      "orderType": "MARKET",
+      "status": "FILLED",
+      "mode": "PAPER"
+    },
+    {
+      "id": "ORD_PAP_103",
+      "time": "30 Oct 2026, 11:30 AM",
+      "symbol": "CRUDEOIL 19NOV26 5800 CE",
+      "underlying": "CRUDEOIL",
+      "strike": 5800,
+      "type": "CE",
+      "action": "BUY",
+      "qty": 100,
+      "price": 110,
+      "orderType": "MARKET",
+      "status": "FILLED",
+      "mode": "PAPER"
+    }
+  ],
+  "positions": [
+    {
+      "id": "POS_PAP_101",
+      "symbol": "NIFTY 05NOV26 24200 CE",
+      "underlying": "NIFTY",
+      "strike": 24200,
+      "type": "CE",
+      "netQty": 50,
+      "buyQty": 50,
+      "sellQty": 0,
+      "buyAvg": 142.5,
+      "currentLtp": 168.2,
+      "pnl": 1285,
+      "unrealizedPnl": 1285,
+      "status": "OPEN",
+      "mode": "PAPER"
+    },
+    {
+      "id": "POS_PAP_102",
+      "symbol": "BANKNIFTY 05NOV26 51800 PE",
+      "underlying": "BANKNIFTY",
+      "strike": 51800,
+      "type": "PE",
+      "netQty": 30,
+      "buyQty": 30,
+      "sellQty": 0,
+      "buyAvg": 285,
+      "currentLtp": 312.4,
+      "pnl": 822,
+      "unrealizedPnl": 822,
+      "status": "OPEN",
+      "mode": "PAPER"
+    },
+    {
+      "id": "POS_PAP_103",
+      "symbol": "CRUDEOIL 19NOV26 5800 CE",
+      "underlying": "CRUDEOIL",
+      "strike": 5800,
+      "type": "CE",
+      "netQty": 100,
+      "buyQty": 100,
+      "sellQty": 0,
+      "buyAvg": 110,
+      "currentLtp": 128.5,
+      "pnl": 1850,
+      "unrealizedPnl": 1850,
+      "status": "OPEN",
+      "mode": "PAPER"
+    }
+  ]
+}

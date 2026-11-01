@@ -11,11 +11,11 @@ class ReplayEngine {
     this.status = 'STOPPED'; // 'STOPPED' | 'PLAYING' | 'PAUSED'
     this.speed = 10;          // 1x, 5x, 10x, 60x
     this.currentMinute = 0;   // 0 to 375 (0 = 09:15, 375 = 15:30)
-    this.basePrice = 24383.6;  // Starting Nifty 50 spot from Dhan API
-    this.spotPrice = 24383.6;
-    this.dayHigh = 24383.6;
-    this.dayLow = 24383.6;
-    this.vix = 13.5;
+    this.basePrice = 23053.10;  // Starting Nifty 50 spot from Dhan API
+    this.spotPrice = 23053.10;
+    this.dayHigh = 23075.40;
+    this.dayLow = 22780.15;
+    this.vix = 13.12;
     this.timer = null;
     this.priceTrajectory = [];
     this.generatedSignals = [];
@@ -72,7 +72,7 @@ class ReplayEngine {
    * Generate full option chain for current replay price
    */
   getChainForPrice(spot) {
-    const roundSpot = Math.round((spot || 24383.6) * 10) / 10;
+    const roundSpot = Math.round((spot || 23053.10) * 10) / 10;
     const key = `${roundSpot}_${this.currentMinute}`;
     
     if (!this._chainMap) this._chainMap = new Map();

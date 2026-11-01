@@ -67,7 +67,8 @@ function VolumeCell({ value, pct }) {
 }
 
 export default function OptionChainView() {
-  const { spot, optionChain: storeChain, lastChainUpdate } = useTradingStore();
+  const { spot: storeSpot, optionChain: storeChain, lastChainUpdate } = useTradingStore();
+  const [symbol, setSymbol] = useState('NIFTY');
   const [chain, setChain] = useState([]);
   const [prevChain, setPrevChain] = useState({});
   const [loading, setLoading] = useState(false);
@@ -76,29 +77,31 @@ export default function OptionChainView() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [filterNearATM, setFilterNearATM] = useState(true);
+  const [spotPrice, setSpotPrice] = useState(null);
   const timerRef = useRef(null);
 
-  // Sync real-time option chain from Zustand WebSocket feed
+  // Sync real-time option chain from Zustand WebSocket feed for NIFTY
   useEffect(() => {
-    if (storeChain && storeChain.length > 0) {
+    if (symbol === 'NIFTY' && storeChain && storeChain.length > 0) {
       const prev = {};
       chain.forEach(r => { prev[r.strike] = r; });
       setPrevChain(prev);
       setChain(storeChain);
       if (lastChainUpdate) setLastUpdate(lastChainUpdate);
     }
-  }, [storeChain, lastChainUpdate]);
+  }, [symbol, storeChain, lastChainUpdate]);
 
   const fetchChain = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/chain`).then(r => r.json());
+      const res = await fetch(`${API_BASE}/chain?symbol=${symbol}`).then(r => r.json());
       if (res.chain && Array.isArray(res.chain)) {
         const prev = {};
         chain.forEach(r => { prev[r.strike] = r; });
         setPrevChain(prev);
         setChain(res.chain);
         setExpiry(res.expiry || '');
+        if (res.spot) setSpotPrice(res.spot);
         setLastUpdate(new Date().toLocaleTimeString('en-IN'));
       }
     } catch (err) {
@@ -108,31 +111,59 @@ export default function OptionChainView() {
     }
   };
 
-  // Fetch chain on mount / timeframe change (real-time updates arrive via WebSocket CHAIN_FEED)
   useEffect(() => {
     fetchChain();
-  }, [timeframe]);
+  }, [symbol, timeframe]);
 
-  const atm = spot ? Math.round(spot / 50) * 50 : null;
+  const stepSize = symbol === 'BANKNIFTY' || symbol === 'SENSEX' ? 100 : (symbol === 'MIDCPNIFTY' ? 25 : (symbol === 'RELIANCE' ? 20 : (symbol === 'HDFCBANK' ? 10 : 50)));
+  const effectiveSpot = (symbol === 'NIFTY' ? (storeSpot || spotPrice || 23053.10) : (spotPrice || (symbol === 'BANKNIFTY' ? 54686.95 : (symbol === 'SENSEX' ? 74459.53 : 24712.20))));
+  const atm = effectiveSpot ? Math.round(effectiveSpot / stepSize) * stepSize : null;
   const displayedChain = filterNearATM && atm && chain.length > 35
-    ? chain.filter(r => Math.abs(r.strike - atm) <= 750)
+    ? chain.filter(r => Math.abs(r.strike - atm) <= stepSize * 15)
     : chain;
   const maxOI = Math.max(...displayedChain.map(r => Math.max(r.ceOI || 0, r.peOI || 0)), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
-      <div className="flex-between">
+      <div className="flex-between" style={{ flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>📊 Option Chain</h1>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-            {expiry ? `Expiry: ${expiry}` : 'Fetching...'}
-            {spot ? ` | Spot: ₹${spot.toLocaleString('en-IN')}` : ''}
+            <strong style={{ color: 'var(--color-accent-blue)' }}>{symbol}</strong>
+            {expiry ? ` | Expiry: ${expiry}` : ' | Fetching...'}
+            {effectiveSpot ? ` | Spot: ₹${effectiveSpot.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : ''}
             {atm ? ` | ATM: ${atm}` : ''}
             {lastUpdate ? ` | Updated: ${lastUpdate}` : ''}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Symbol Selector */}
+          <select
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-bg-secondary)',
+              color: 'var(--color-text-primary)',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="NIFTY">NIFTY 50 (NSE)</option>
+            <option value="BANKNIFTY">BANK NIFTY (NSE)</option>
+            <option value="FINNIFTY">FIN NIFTY (NSE)</option>
+            <option value="MIDCPNIFTY">MIDCAP NIFTY (NSE)</option>
+            <option value="SENSEX">BSE SENSEX (BSE)</option>
+            <option value="RELIANCE">RELIANCE (NSE)</option>
+            <option value="TCS">TCS (NSE)</option>
+            <option value="HDFCBANK">HDFCBANK (NSE)</option>
+            <option value="INFY">INFY (NSE)</option>
+          </select>
           {/* Near ATM Filter Toggle */}
           <button
             className={`btn btn-sm ${filterNearATM ? 'btn-primary' : 'btn-ghost'}`}

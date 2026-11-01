@@ -1,0 +1,63 @@
+[
+  {
+    "id": "pol_a586fa23",
+    "name": "Bollinger Band & DC policy",
+    "description": "Bollinger Band & DC policy",
+    "symbol": "All Stocks",
+    "timeframe": "ALL",
+    "enabled": true,
+    "autoTrade": false,
+    "soundAlert": true,
+    "targetPoints": 100,
+    "stopLossPoints": 50,
+    "trailingSL": 50,
+    "entryConditions": {
+      "long": [
+        {
+          "left": "BB_LOWER",
+          "comparator": "IS_BELOW",
+          "rightType": "INDICATOR",
+          "rightValue": 0,
+          "period": 20,
+          "mult": 2,
+          "rightIndicator": "DC_LOWER"
+        },
+        {
+          "left": "BB_LOWER",
+          "comparator": "IS_BELOW",
+          "rightType": "VALUE",
+          "rightValue": 0,
+          "rightIndicator": "KC_LOWER",
+          "indicator": "BOLLINGER",
+          "value": -1
+        }
+      ],
+      "longLogic": "OR",
+      "short": [
+        {
+          "indicator": "BOLLINGER",
+          "comparator": "IS_ABOVE",
+          "rightType": "INDICATOR",
+          "rightIndicator": "DC_UPPER"
+        }
+      ],
+      "shortLogic": "AND"
+    },
+    "exitConditions": {
+      "long": [],
+      "longLogic": "OR",
+      "short": [],
+      "shortLogic": "OR"
+    },
+    "customTradingViewScript": {
+      "enabled": false,
+      "expression": "",
+      "webhookSecret": "tv_secret_default"
+    },
+    "createdAt": "2026-11-01T03:35:47.377Z",
+    "updatedAt": "2026-11-01T09:23:01.176Z",
+    "universes": [
+      "All Stocks"
+    ]
+  }
+]

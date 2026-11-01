@@ -5,39 +5,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ─── CSS Variables ──────────────────────────── */
-:root {
-  --color-bg-primary: #0a0e1a;
-  --color-bg-secondary: #0f1629;
-  --color-bg-card: #111827;
-  --color-bg-elevated: #1a2235;
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-hover: rgba(255, 255, 255, 0.12);
+:root, body.theme-light {
+  /* ─── ThetaGrid: Clean White Middle Page & Dark Blue Sidebar Theme ─── */
+  --color-bg-primary: #f8fafc;        /* Middle page background: Clean white */
+  --color-bg-secondary: #ffffff;      /* Secondary white background */
+  --color-bg-card: #ffffff;           /* Cards: Crisp White */
+  --color-bg-elevated: #f1f5f9;       /* Elevated surface / light slate */
+  --color-sidebar-bg: #09142f;        /* Sidebar background: Deep Dark Blue */
+  --color-sidebar-border: #17274a;    /* Sidebar border */
+  --color-border: #e2e8f0;
+  --color-border-hover: #2563eb;
 
   /* Accent colors */
-  --color-accent-blue: #3b82f6;
-  --color-accent-cyan: #06b6d4;
-  --color-accent-green: #10b981;
-  --color-accent-red: #ef4444;
-  --color-accent-yellow: #f59e0b;
-  --color-accent-purple: #8b5cf6;
-  --color-accent-orange: #f97316;
+  --color-accent-blue: #2563eb;
+  --color-accent-cyan: #0284c7;
+  --color-accent-green: #059669;
+  --color-accent-red: #dc2626;
+  --color-accent-yellow: #d97706;
+  --color-accent-purple: #7c3aed;
+  --color-accent-orange: #ea580c;
 
-  /* Text */
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #475569;
+  /* Text: High Contrast Dark Navy & Slate for Crisp Readability on White */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
 
   /* Gradients */
-  --gradient-blue: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-  --gradient-green: linear-gradient(135deg, #064e3b 0%, #10b981 100%);
-  --gradient-red: linear-gradient(135deg, #7f1d1d 0%, #ef4444 100%);
-  --gradient-purple: linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%);
-  --gradient-card: linear-gradient(145deg, #111827 0%, #1a2235 100%);
+  --gradient-blue: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --gradient-green: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --gradient-red: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  --gradient-purple: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  --gradient-card: #ffffff;
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.05);
 
   /* Semantic */
-  --color-profit: #10b981;
-  --color-loss: #ef4444;
-  --color-neutral: #94a3b8;
+  --color-profit: #059669;
+  --color-loss: #dc2626;
+  --color-neutral: #64748b;
 
   /* Spacing */
   --spacing-xs: 4px;
@@ -54,9 +58,8 @@
   --radius-xl: 20px;
 
   /* Shadows */
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
-  --shadow-elevated: 0 8px 40px rgba(0, 0, 0, 0.6);
-  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.25);
+  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --shadow-glow-blue: 0 0 20px rgba(37, 99, 235, 0.25);
   --shadow-glow-green: 0 0 20px rgba(16, 185, 129, 0.25);
   --shadow-glow-red: 0 0 20px rgba(239, 68, 68, 0.25);
 
@@ -64,6 +67,43 @@
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-slow: 400ms ease;
+}
+
+body.theme-darkblue {
+  /* ─── Dark Blue Theme Alternative ─── */
+  --color-bg-primary: #060b18;
+  --color-bg-secondary: #09142f;
+  --color-bg-card: #0f1c3d;
+  --color-bg-elevated: #152752;
+  --color-border: #1e3568;
+  --color-border-hover: #3b82f6;
+
+  /* Accent colors */
+  --color-accent-blue: #3b82f6;
+  --color-accent-cyan: #38bdf8;
+  --color-accent-green: #10b981;
+  --color-accent-red: #ef4444;
+  --color-accent-yellow: #f59e0b;
+  --color-accent-purple: #8b5cf6;
+  --color-accent-orange: #f97316;
+
+  /* Text: High Contrast Crisp White and Ice Blue */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #93c5fd;
+  --color-text-muted: #60a5fa80;
+
+  /* Gradients */
+  --gradient-blue: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+  --gradient-green: linear-gradient(135deg, #064e3b 0%, #10b981 100%);
+  --gradient-red: linear-gradient(135deg, #7f1d1d 0%, #ef4444 100%);
+  --gradient-purple: linear-gradient(135deg, #4c1d95 0%, #8b5cf6 100%);
+  --gradient-card: linear-gradient(145deg, #0d1938 0%, #13234b 100%);
+  --shadow-card: 0 4px 24px rgba(0, 8, 30, 0.5);
+
+  /* Semantic */
+  --color-profit: #10b981;
+  --color-loss: #ef4444;
+  --color-neutral: #94a3b8;
 }
 
 /* ─── Reset & Base ───────────────────────────── */
@@ -124,7 +164,7 @@ body {
 
 .app-content {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 260px 1fr;
   flex: 1;
   overflow: hidden;
 }
@@ -135,6 +175,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  background: var(--color-bg-primary);
 }
 
 /* ─── Cards ──────────────────────────────────── */

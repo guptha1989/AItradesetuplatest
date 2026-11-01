@@ -1,7 +1,20 @@
 import { create } from 'zustand';
 
-const WS_URL = 'ws://localhost:3001/ws';
-const API_BASE = 'http://localhost:3001/api';
+const getWSUrl = () => {
+  if (typeof window === 'undefined') return 'ws://localhost:3001/ws';
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.hostname || 'localhost';
+  return `${proto}//${host}:3001/ws`;
+};
+
+const getApiBase = () => {
+  if (typeof window === 'undefined') return 'http://localhost:3001/api';
+  const proto = window.location.protocol;
+  const host = window.location.hostname || 'localhost';
+  return `${proto}//${host}:3001/api`;
+};
+
+const API_BASE = getApiBase();
 
 export const useTradingStore = create((set, get) => ({
   // ─── WebSocket ────────────────────────────────
@@ -10,14 +23,15 @@ export const useTradingStore = create((set, get) => ({
   wsReconnecting: false,
 
   // ─── Market Data ──────────────────────────────
-  spot: 23500,
-  spotChange: 0,
-  spotChangePercent: 0,
-  dayHigh: 23500,
-  dayLow: 23500,
-  vix: 13.5,
-  pcr: 1.05,
-  atm: 23500,
+  spot: 23053.10,
+  spotChange: 299.90,
+  spotChangePercent: 1.32,
+  dayHigh: 23075.40,
+  dayLow: 22780.15,
+  vix: 13.12,
+  pcr: 1.25,
+  atm: 23050,
+  lastWsTickTime: null,
 
   // ─── Replay State ─────────────────────────────
   replayMode: false,
@@ -50,6 +64,9 @@ export const useTradingStore = create((set, get) => ({
   positions: [],
   recentOrders: [],
   alerts: [],
+  policyAlerts: [],
+  savedPolicies: [],
+  unreadPolicyAlerts: 0,
 
   // ─── System ───────────────────────────────────────────────
   paperMode: true,
@@ -65,6 +82,22 @@ export const useTradingStore = create((set, get) => ({
   // ─── UI ───────────────────────────────────────────────────
   activePage: 'dashboard',
   setActivePage: (page) => set({ activePage: page }),
+  theme: typeof window !== 'undefined' ? (localStorage.getItem('app_theme') || 'light') : 'light',
+  toggleTheme: () => set(state => {
+    const next = state.theme === 'dark' ? 'light' : 'dark';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_theme', next);
+      document.body.className = next === 'light' ? 'theme-light' : 'theme-darkblue';
+    }
+    return { theme: next };
+  }),
+  setTheme: (theme) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('app_theme', theme);
+      document.body.className = theme === 'light' ? 'theme-light' : 'theme-darkblue';
+    }
+    set({ theme });
+  },
 
   // ─── Replay Actions ───────────────────────────
   setReplayMode: (enabled) => set({ replayMode: enabled }),
@@ -217,32 +250,42 @@ export const useTradingStore = create((set, get) => ({
       return; // Already connecting or open
     }
 
-    const ws = new WebSocket(WS_URL);
+    try {
+      const url = getWSUrl();
+      const ws = new WebSocket(url);
 
-    ws.onopen = () => {
-      set({ ws, wsConnected: true, wsReconnecting: false });
-      console.log('✅ WebSocket connected');
-      get().fetchLiveData();
-    };
+      ws.onopen = () => {
+        set({ ws, wsConnected: true, wsReconnecting: false });
+        console.log('✅ WebSocket connected to', url);
+        get().fetchLiveData();
+      };
 
-    ws.onmessage = (event) => {
-      try {
-        const { channel, data } = JSON.parse(event.data);
-        get()._handleMessage(channel, data);
-      } catch (err) {
-        console.error('WS parse error:', err);
-      }
-    };
+      ws.onmessage = (event) => {
+        try {
+          const { channel, data } = JSON.parse(event.data);
+          get()._handleMessage(channel, data);
+        } catch (err) {
+          console.error('WS parse error:', err);
+        }
+      };
 
-    ws.onclose = () => {
-      set({ wsConnected: false, wsReconnecting: true });
-      setTimeout(() => {
-        if (!get().wsConnected) get().connectWS();
-      }, 5000);
-    };
+      ws.onclose = () => {
+        set({ ws: null, wsConnected: false, wsReconnecting: true });
+        setTimeout(() => {
+          get().connectWS();
+        }, 2000);
+      };
 
-    ws.onerror = (err) => console.error('WS error:', err);
-    set({ ws });
+      ws.onerror = (err) => {
+        console.warn('WS error/reconnecting:', err);
+        try { ws.close(); } catch (_) {}
+      };
+
+      set({ ws });
+    } catch (e) {
+      console.error('WS instantiation failed:', e);
+      setTimeout(() => get().connectWS(), 2000);
+    }
   },
 
   _handleMessage: (channel, data) => {
@@ -259,6 +302,7 @@ export const useTradingStore = create((set, get) => ({
             dayLow: data.low || Math.min(state.dayLow, ltp || Infinity),
             vix: data.vix || state.vix,
             atm,
+            lastWsTickTime: data.time || new Date().toLocaleTimeString('en-IN'),
             replayTime: data.time || state.replayTime,
             replayProgress: data.progressPct || state.replayProgress,
             replayMinute: data.replayMinute || state.replayMinute,
@@ -309,9 +353,35 @@ export const useTradingStore = create((set, get) => ({
         break;
 
       case 'ALERT_FEED':
-        set((state) => ({
-          alerts: [data, ...state.alerts].slice(0, 20),
-        }));
+        if (data.type === 'POLICY_ALERT' && data.alert) {
+          try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = new AudioCtx();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(659.25, ctx.currentTime);
+              osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1);
+              gain.gain.setValueAtTime(0.2, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.35);
+            }
+          } catch (e) {}
+
+          set((state) => ({
+            policyAlerts: [data.alert, ...state.policyAlerts].slice(0, 150),
+            unreadPolicyAlerts: state.unreadPolicyAlerts + 1,
+            alerts: [data, ...state.alerts].slice(0, 30),
+          }));
+        } else {
+          set((state) => ({
+            alerts: [data, ...state.alerts].slice(0, 20),
+          }));
+        }
         break;
 
       case 'CHAIN_FEED':
@@ -343,4 +413,35 @@ export const useTradingStore = create((set, get) => ({
     })),
 
   clearSignals: () => set({ signals: [], latestSignal: null }),
+
+  fetchPolicyAlerts: async (months = 6, limit = 500) => {
+    try {
+      const res = await fetch(`${API_BASE}/policies/alerts?months=${months}&limit=${limit}`).then(r => r.json());
+      if (res.alerts) {
+        set({ policyAlerts: res.alerts });
+      }
+    } catch (e) {
+      console.error('Error fetching policy alerts:', e);
+    }
+  },
+
+  markAlertsRead: () => set({ unreadPolicyAlerts: 0 }),
+
+  fetchSavedPolicies: async () => {
+    try {
+      const res = await fetch(`${API_BASE}/policies`).then(r => r.json());
+      if (res.policies) set({ savedPolicies: res.policies });
+    } catch (e) {
+      console.error('Error fetching saved policies:', e);
+    }
+  },
+
+  clearPolicyAlerts: async () => {
+    try {
+      await fetch(`${API_BASE}/policies/alerts/clear`, { method: 'POST' });
+      set({ policyAlerts: [], unreadPolicyAlerts: 0 });
+    } catch (e) {
+      console.error('Error clearing alerts:', e);
+    }
+  },
 }));

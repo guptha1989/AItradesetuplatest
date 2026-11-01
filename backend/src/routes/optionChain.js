@@ -18,9 +18,9 @@ router.get('/', async (req, res) => {
     const expiry = req.query.expiry || '';
     const symbol = req.query.symbol || 'NIFTY';
 
-    // Prefer liveEngine if live & updated
+    // Prefer liveEngine if live & updated for NIFTY
     const liveData = liveEngine.getLatestData();
-    if (liveEngine.isLive && liveData.chain && liveData.chain.length > 0) {
+    if (symbol.toUpperCase() === 'NIFTY' && liveEngine.isLive && liveData.chain && liveData.chain.length > 0) {
       return res.json(liveData);
     }
     const cacheKey = `${symbol}_${expiry}`;

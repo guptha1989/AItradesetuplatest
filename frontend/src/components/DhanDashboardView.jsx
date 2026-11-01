@@ -8,12 +8,12 @@ export default function DhanDashboardView() {
 
   const [symbol, setSymbol] = useState('NIFTY');
   const [instrumentType, setInstrumentType] = useState('Index Options');
-  const [selectedExpiry, setSelectedExpiry] = useState('');
+  const [selectedExpiry, setSelectedExpiry] = useState('2026-11-05');
   const [optionType, setOptionType] = useState('ALL');
   const [strikeFilter, setStrikeFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [expiries, setExpiries] = useState(['2026-08-04', '2026-08-11', '2026-08-18', '2026-08-25', '2026-09-01']);
+  const [expiries, setExpiries] = useState(['2026-11-05', '2026-11-12', '2026-11-26', '2026-12-31']);
   const [contracts, setContracts] = useState([]);
   const [parameters, setParameters] = useState({
     provider: 'Dhan HQ API v2',

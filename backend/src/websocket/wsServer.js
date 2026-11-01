@@ -39,6 +39,42 @@ class WsServer {
         serverTime: new Date().toISOString(),
       });
 
+      // Immediately push latest market snapshot to the newly connected client
+      try {
+        const { liveEngine } = require('../api/dhan/liveEngine');
+        if (liveEngine && liveEngine.latestData) {
+          const ld = liveEngine.latestData;
+          this._send(ws, 'TICK_FEED', {
+            type: 'TICK',
+            symbol: 'NIFTY',
+            spot: ld.spot,
+            ltp: ld.spot,
+            change: ld.change,
+            changePercent: ld.changePercent,
+            high: ld.dayHigh || Math.max(ld.spot, 23075.40),
+            low: ld.dayLow || Math.min(ld.spot, 22780.15),
+            vix: ld.vix || 13.12,
+            atm: ld.atm || Math.round(ld.spot / 50) * 50,
+            time: ld.updatedAt || new Date().toLocaleTimeString('en-IN'),
+          });
+
+          if (ld.chain && ld.chain.length > 0) {
+            this._send(ws, 'CHAIN_FEED', {
+              spot: ld.spot,
+              spotChange: ld.change,
+              spotChangePercent: ld.changePercent,
+              atm: ld.atm,
+              pcr: ld.pcr,
+              expiry: ld.expiry,
+              chain: ld.chain,
+              updatedAt: ld.updatedAt,
+            });
+          }
+        }
+      } catch (err) {
+        logger.error('Failed to send initial snapshot to WS client:', err.message);
+      }
+
       ws.on('message', (msg) => this._handleClientMessage(clientId, ws, msg));
       const cleanup = () => {
         if (this.clients.has(clientId)) {

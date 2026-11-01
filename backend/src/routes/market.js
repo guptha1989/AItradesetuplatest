@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { getLTP, getPositions, getFundLimits } = require('../api/dhan/dhanClient');
+const { getLTP, getPositions, getFundLimits, refreshContractDataForRequiredInstruments } = require('../api/dhan/dhanClient');
+const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const logger = require('../utils/logger');
 
 // GET /api/market/ltp
@@ -252,7 +253,8 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
     const { pair0915, pair0916, pair0917, pairsMap0915, pairsMap0916, pairsMap0917 } = findTripleCEPairs(chainData, spot);
 
     const todayStr = new Date().toISOString().split('T')[0];
-    let expiries = ocRes.expiries || ['2026-08-04', '2026-08-11', '2026-08-18', '2026-08-25', '2026-09-01'];
+    const defaultThursdayList = getThursdayExpiries().map(e => e.id);
+    let expiries = ocRes.expiries && ocRes.expiries.length > 0 ? ocRes.expiries : defaultThursdayList;
     const activeExpiries = expiries.filter(e => e >= todayStr);
 
     let filterStrikeNum = reqStrike ? parseInt(reqStrike) : null;
@@ -357,6 +359,37 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
   } catch (err) {
     logger.error('Fetch Dhan chain dashboard error:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/market/expiries — Returns the 4 standard Thursday expiries (Current Week, Next Week, Current Month, Next Month)
+router.get('/expiries', (req, res) => {
+  try {
+    const list = getThursdayExpiries();
+    res.json({
+      success: true,
+      expiries: list,
+      currentWeek: list[0]?.id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/market/refresh-contracts — Weekly Thursday Rollover manual or automated trigger
+router.post('/refresh-contracts', async (req, res) => {
+  try {
+    logger.info('Manual/Automated trigger: Refreshing contract data for all required instruments...');
+    const result = await refreshContractDataForRequiredInstruments();
+    res.json({
+      success: true,
+      message: 'Contract data refreshed successfully for all required instruments',
+      result,
+    });
+  } catch (err) {
+    logger.error('Refresh contracts failed:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

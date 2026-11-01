@@ -1,6 +1,7 @@
 const axios = require('axios');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
+const { getThursdayExpiries, getNextThursdayExpiry } = require('../../utils/expiryHelper');
 
 const BASE_URL = config.dhan.baseUrl;
 
@@ -24,101 +25,155 @@ dhanHttp.interceptors.response.use(
   }
 );
 
-// ─── Market Data ─────────────────────────────────────────────────────────────
+// ─── Instrument to Dhan Security ID Mapping ──────────────────────────────────
+const SCRIP_MAP = {
+  // Indices
+  'NIFTY': { scrip: 13, seg: 'IDX_I', step: 50, exchange: 'NSE', spot: 23053.10, lotSize: 25 },
+  'BANKNIFTY': { scrip: 25, seg: 'IDX_I', step: 100, exchange: 'NSE', spot: 54686.95, lotSize: 15 },
+  'FINNIFTY': { scrip: 27, seg: 'IDX_I', step: 50, exchange: 'NSE', spot: 24712.20, lotSize: 25 },
+  'MIDCPNIFTY': { scrip: 443, seg: 'IDX_I', step: 25, exchange: 'NSE', spot: 12360.40, lotSize: 50 },
+  'SENSEX': { scrip: 51, seg: 'IDX_I', step: 100, exchange: 'BSE', spot: 74459.53, lotSize: 10 },
+  'BANKEX': { scrip: 52, seg: 'IDX_I', step: 100, exchange: 'BSE', spot: 58400.00, lotSize: 15 },
 
-let optionChainCache = { data: null, expiresAt: 0 };
-let cachedExpiry = { date: '2026-08-04', expiresAt: 0 };
+  // NSE Equities
+  'RELIANCE': { scrip: 2885, seg: 'NSE_EQ', step: 20, exchange: 'NSE', spot: 1164.90, lotSize: 250 },
+  'TCS': { scrip: 11536, seg: 'NSE_EQ', step: 50, exchange: 'NSE', spot: 2502.60, lotSize: 175 },
+  'HDFCBANK': { scrip: 1333, seg: 'NSE_EQ', step: 10, exchange: 'NSE', spot: 692.80, lotSize: 550 },
+  'INFY': { scrip: 1594, seg: 'NSE_EQ', step: 20, exchange: 'NSE', spot: 1185.00, lotSize: 400 },
+  'ICICIBANK': { scrip: 4963, seg: 'NSE_EQ', step: 10, exchange: 'NSE', spot: 1398.00, lotSize: 700 },
+  'TATAMOTORS': { scrip: 3456, seg: 'NSE_EQ', step: 5, exchange: 'NSE', spot: 265.40, lotSize: 700 },
+  'SBIN': { scrip: 3045, seg: 'NSE_EQ', step: 10, exchange: 'NSE', spot: 961.85, lotSize: 750 },
+  'BHARTIARTL': { scrip: 10604, seg: 'NSE_EQ', step: 20, exchange: 'NSE', spot: 1973.70, lotSize: 475 },
+  'BAJFINANCE': { scrip: 317, seg: 'NSE_EQ', step: 50, exchange: 'NSE', spot: 7100.00, lotSize: 125 },
+  'TRENT': { scrip: 1964, seg: 'NSE_EQ', step: 50, exchange: 'NSE', spot: 7400.00, lotSize: 100 },
 
-function getNextTuesdayExpiry() {
-  const d = new Date();
-  const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
-  const istDate = new Date(utcMs + (330 * 60000));
-  const day = istDate.getDay();
-  let diff = (2 - day + 7) % 7;
-  const hh = istDate.getHours();
-  const mm = istDate.getMinutes();
-  if (day === 2 && (hh > 15 || (hh === 15 && mm >= 30))) {
-    diff = 7;
-  }
-  istDate.setDate(istDate.getDate() + diff);
-  return istDate.toISOString().split('T')[0];
-}
+  // MCX Commodities
+  'CRUDEOIL': { scrip: null, seg: 'MCX_COMM', step: 50, exchange: 'MCX', spot: 5840.00, lotSize: 100 },
+  'GOLD': { scrip: null, seg: 'MCX_COMM', step: 100, exchange: 'MCX', spot: 78450.00, lotSize: 10 },
+  'SILVER': { scrip: null, seg: 'MCX_COMM', step: 500, exchange: 'MCX', spot: 95200.00, lotSize: 30 },
+  'NATURALGAS': { scrip: null, seg: 'MCX_COMM', step: 5, exchange: 'MCX', spot: 234.50, lotSize: 1250 },
+  'COPPER': { scrip: null, seg: 'MCX_COMM', step: 5, exchange: 'MCX', spot: 828.40, lotSize: 2500 },
+
+  // BSE Smallcaps
+  'TTML': { scrip: null, seg: 'BSE_EQ', step: 2.5, exchange: 'BSE', spot: 75.20, lotSize: 1000 },
+  'BCG': { scrip: null, seg: 'BSE_EQ', step: 0.5, exchange: 'BSE', spot: 12.40, lotSize: 2000 },
+  'SUZLON': { scrip: null, seg: 'BSE_EQ', step: 2.5, exchange: 'BSE', spot: 65.00, lotSize: 1000 },
+};
+
+// Multi-symbol option chain and expiry caches
+const optionChainCache = new Map(); // Key: `${symbol}_${expiry}` -> { data, expiresAt }
+const cachedExpiries = new Map();   // Key: symbol -> { date, expiresAt }
 
 async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
-  if (cachedExpiry.date && Date.now() < cachedExpiry.expiresAt) {
-    return cachedExpiry.date;
+  const sym = (underlyingSymbol || 'NIFTY').toUpperCase();
+  const cached = cachedExpiries.get(sym);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.date;
   }
-  const defaultTuesday = getNextTuesdayExpiry();
+
+  const defaultThursday = getNextThursdayExpiry();
   const todayStr = new Date().toISOString().split('T')[0];
+  const scripMeta = SCRIP_MAP[sym];
+
+  if (!scripMeta || !scripMeta.scrip) {
+    return defaultThursday;
+  }
 
   try {
     const expRes = await dhanHttp.post('/optionchain/expirylist', {
-      UnderlyingScrip: underlyingSymbol === 'BANKNIFTY' ? 25 : 13,
-      UnderlyingSeg: 'IDX_I',
+      UnderlyingScrip: scripMeta.scrip,
+      UnderlyingSeg: scripMeta.seg,
     });
     const list = expRes.data?.data || expRes.data || expRes;
     if (Array.isArray(list) && list.length > 0) {
-      // Filter out past expired dates
       const activeList = list.filter(exp => exp >= todayStr);
-      const chosen = activeList.length > 0 ? activeList[0] : defaultTuesday;
-      cachedExpiry = { date: chosen, expiresAt: Date.now() + 600000 };
+      const chosen = activeList.length > 0 ? activeList[0] : list[0];
+      cachedExpiries.set(sym, { date: chosen, expiresAt: Date.now() + 600000 });
       return chosen;
     }
   } catch (e) {
-    logger.warn(`Failed to fetch Dhan expiry list, using Tuesday fallback ${defaultTuesday}:`, e.message);
+    logger.warn(`Failed to fetch Dhan expiry list for ${sym}, fallback ${defaultThursday}: ${e.message}`);
   }
-  return defaultTuesday;
+  return defaultThursday;
 }
 
 /**
- * Get full option chain for Nifty from Dhan API.
- * @param {string} underlyingSymbol - e.g., 'NIFTY'
+ * Get full option chain for any instrument from Dhan API.
+ * @param {string} underlyingSymbol - e.g., 'NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE'
  * @param {string} expiryDate - 'YYYY-MM-DD' (optional)
  */
 async function getOptionChain(underlyingSymbol = 'NIFTY', expiryDate) {
-  // If cache is fresh, return immediately (0ms delay)
-  if (optionChainCache.data && Date.now() < optionChainCache.expiresAt) {
-    return optionChainCache.data;
+  const sym = (underlyingSymbol || 'NIFTY').toUpperCase();
+  const cacheKey = `${sym}_${expiryDate || 'default'}`;
+
+  // If cache is fresh for this exact symbol, return immediately
+  const cached = optionChainCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
   }
 
-  // Await refresh so callers get live Dhan HQ data
-  await refreshOptionChainCacheBackground(underlyingSymbol, expiryDate);
+  // Refresh cache from Dhan
+  await refreshOptionChainCacheBackground(sym, expiryDate);
 
-  // Return fresh cache
-  if (optionChainCache.data) {
-    return optionChainCache.data;
+  const fresh = optionChainCache.get(cacheKey);
+  if (fresh) {
+    return fresh.data;
   }
 
-  const { replayEngine } = require('../../utils/replayEngine');
-  const fallbackSpot = replayEngine.spotPrice || 24383.6;
-  const fallbackAtm = Math.round(fallbackSpot / 50) * 50;
+  // Fallback if network fails
+  const scripMeta = SCRIP_MAP[sym] || SCRIP_MAP.NIFTY;
+  const fallbackSpot = scripMeta.spot || 23053.10;
+  const fallbackAtm = Math.round(fallbackSpot / scripMeta.step) * scripMeta.step;
 
   return {
+    symbol: sym,
     spot: fallbackSpot,
     atm: fallbackAtm,
-    expiry: expiryDate || '2026-08-04',
-    chain: replayEngine.getCurrentChain(),
+    expiry: expiryDate || getNextThursdayExpiry(),
+    chain: [],
   };
 }
 
 async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', expiryDate) {
+  const sym = (underlyingSymbol || 'NIFTY').toUpperCase();
+  const scripMeta = SCRIP_MAP[sym];
+  const targetExpiry = expiryDate || getNextThursdayExpiry();
+  const cacheKey = `${sym}_${targetExpiry}`;
+
+  if (!scripMeta || !scripMeta.scrip) {
+    // Non-F&O or MCX commodity fallback
+    const fallbackSpot = scripMeta?.spot || 23053.10;
+    const fallbackStep = scripMeta?.step || 50;
+    optionChainCache.set(cacheKey, {
+      data: {
+        symbol: sym,
+        spot: fallbackSpot,
+        atm: Math.round(fallbackSpot / fallbackStep) * fallbackStep,
+        expiry: targetExpiry,
+        chain: [],
+      },
+      expiresAt: Date.now() + 60000,
+    });
+    return;
+  }
+
   try {
     let targetExpiry = expiryDate;
     if (!targetExpiry) {
-      targetExpiry = await getRealDhanExpiry(underlyingSymbol);
+      targetExpiry = await getRealDhanExpiry(sym);
     }
 
     const res = await dhanHttp.post('/optionchain', {
-      UnderlyingScrip: underlyingSymbol === 'BANKNIFTY' ? 25 : 13,
-      UnderlyingSeg: 'IDX_I',
+      UnderlyingScrip: scripMeta.scrip,
+      UnderlyingSeg: scripMeta.seg,
       Expiry: targetExpiry,
     });
 
     const chainData = res.data?.data || res.data || res;
-    const spot = chainData.last_price || 24383.6;
+    const spot = Number(chainData.last_price || scripMeta.spot);
     const ocMap = chainData.oc || {};
 
-    const atm = Math.round(spot / 50) * 50;
+    const atm = Math.round(spot / scripMeta.step) * scripMeta.step;
     const strikes = Object.keys(ocMap).map(Number).sort((a, b) => a - b);
 
     const chainArray = strikes.map(strike => {
@@ -178,18 +233,29 @@ async function refreshOptionChainCacheBackground(underlyingSymbol = 'NIFTY', exp
     });
 
     const result = {
+      symbol: sym,
       spot,
       atm,
+      step: scripMeta.step,
       expiry: targetExpiry,
       chain: chainArray,
     };
 
-    optionChainCache = { data: result, expiresAt: Date.now() + 10000 };
+    optionChainCache.set(cacheKey, { data: result, expiresAt: Date.now() + 15000 });
   } catch (err) {
-    logger.warn('getOptionChain API rate limited or unavailable, retaining live cache:', err.message);
-    if (optionChainCache.data) {
-      optionChainCache.expiresAt = Date.now() + 6000;
-    }
+    logger.warn(`getOptionChain API error for ${sym}, retaining fallback: ${err.message}`);
+    const fallbackSpot = scripMeta.spot;
+    const fallbackStep = scripMeta.step;
+    optionChainCache.set(cacheKey, {
+      data: {
+        symbol: sym,
+        spot: fallbackSpot,
+        atm: Math.round(fallbackSpot / fallbackStep) * fallbackStep,
+        expiry: expiryDate || getNextThursdayExpiry(),
+        chain: [],
+      },
+      expiresAt: Date.now() + 10000,
+    });
   }
 }
 
@@ -286,7 +352,34 @@ async function getTrades() {
 }
 
 function getNextWeeklyExpiry() {
-  return cachedExpiry.date || '2026-08-04';
+  return getNextThursdayExpiry();
+}
+
+/**
+ * Weekly Thursday Rollover Pipeline
+ * Pulls updated contract data from Dhan API for all required instruments
+ */
+async function refreshContractDataForRequiredInstruments() {
+  const currentExpiry = getNextThursdayExpiry();
+  logger.info(`[Thursday Rollover Pipeline] Pulling updated contract data for all required instruments. Target Expiry: ${currentExpiry}`);
+  const instruments = Object.keys(SCRIP_MAP);
+  const results = {};
+  for (const sym of instruments) {
+    try {
+      const chain = await getOptionChain(sym, currentExpiry);
+      results[sym] = {
+        success: true,
+        spot: chain.spot,
+        atm: chain.atm,
+        expiry: chain.expiry,
+        strikes: chain.chain?.length || 0,
+      };
+      logger.info(`[Thursday Rollover Pipeline] Contract data updated for ${sym} (Spot: ${chain.spot}, ATM: ${chain.atm}, Expiry: ${chain.expiry})`);
+    } catch (e) {
+      logger.warn(`[Thursday Rollover Pipeline] Failed to update contract data for ${sym}: ${e.message}`);
+    }
+  }
+  return { expiry: currentExpiry, instruments: results, timestamp: new Date().toISOString() };
 }
 
 function tradingDaysToExpiry(expiryDateStr) {
@@ -303,6 +396,7 @@ function tradingDaysToExpiry(expiryDateStr) {
 }
 
 module.exports = {
+  SCRIP_MAP,
   getOptionChain,
   getQuotes,
   getLTP,
@@ -317,7 +411,9 @@ module.exports = {
   getOrderById,
   getTrades,
   getNextWeeklyExpiry,
+  getNextThursdayExpiry,
+  getThursdayExpiries,
   getRealDhanExpiry,
-  getNextTuesdayExpiry,
+  refreshContractDataForRequiredInstruments,
   tradingDaysToExpiry,
 };

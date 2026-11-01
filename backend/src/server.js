@@ -26,12 +26,18 @@ const srRoutes = require('./routes/sr');
 const trendingOIRoutes = require('./routes/trendingOI');
 const replayRoutes = require('./routes/replay');
 const historicalRoutes = require('./routes/historical');
+const historicalSqlRoutes = require('./routes/historicalData');
+const policyRoutes = require('./routes/policies');
+const oiCrossoverRoutes = require('./routes/oiCrossover');
+const premiumDecayRoutes = require('./routes/premiumDecay');
+const chartRoutes = require('./routes/charts');
+const aiRoutes = require('./routes/aiChat');
 
 // ─── App Setup ───────────────────────────────────────────────
 const app = express();
 const httpServer = http.createServer(app);
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3000'] }));
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -47,6 +53,12 @@ app.use('/api/sr', srRoutes);
 app.use('/api/trending-oi', trendingOIRoutes);
 app.use('/api/replay', replayRoutes);
 app.use('/api/historical', historicalRoutes);
+app.use('/api/historical-sql', historicalSqlRoutes);
+app.use('/api/policies', policyRoutes);
+app.use('/api/oi-crossover', oiCrossoverRoutes);
+app.use('/api/premium-decay', premiumDecayRoutes);
+app.use('/api/charts', chartRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -194,6 +206,24 @@ cron.schedule('35 15 * * 1-5', async () => {
     level: 'INFO',
     message: 'Market closed. EOD summary generating...',
   });
+}, { timezone: 'Asia/Kolkata' });
+
+/**
+ * Every week Thursday at 15:30:15 IST (Weekly Expiry Market Rollover):
+ * Automatically pull and store updated contract data from Dhan API for all required instruments
+ */
+cron.schedule('30 15 * * 4', async () => {
+  try {
+    const { refreshContractDataForRequiredInstruments } = require('./api/dhan/dhanClient');
+    logger.info('🔔 [Thursday 15:30 IST] Weekly Expiry Market Rollover triggered — pulling updated contracts for all instruments...');
+    const result = await refreshContractDataForRequiredInstruments();
+    wsServer.broadcast('ALERT_FEED', {
+      level: 'INFO',
+      message: `🔄 Thursday Rollover: Active contract updated to ${result.expiry} for all instruments.`,
+    });
+  } catch (err) {
+    logger.error('Thursday contract rollover job failed:', err.message);
+  }
 }, { timezone: 'Asia/Kolkata' });
 
 // Periodic memory garbage collection guard
