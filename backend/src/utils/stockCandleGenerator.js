@@ -65,6 +65,11 @@ function generateStockCandles(stock, fromDate, toDate, timeframe = '5m') {
   const cur = new Date(start);
   let barIndex = 0;
 
+  // Resolve current Indian Standard Time (Asia/Kolkata) to prevent future candle generation on today
+  const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const todayYmd = `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, '0')}-${String(istNow.getDate()).padStart(2, '0')}`;
+  const currentIstTimeStr = `${String(istNow.getHours()).padStart(2, '0')}:${String(istNow.getMinutes()).padStart(2, '0')}:${String(istNow.getSeconds()).padStart(2, '0')}`;
+
   while (cur <= end) {
     const dayOfWeek = cur.getDay();
     // Skip weekends (Saturday: 6, Sunday: 0)
@@ -76,9 +81,14 @@ function generateStockCandles(stock, fromDate, toDate, timeframe = '5m') {
       const dateFormatted = formatMarketDate(cur);
 
       for (const timeSlot of intradaySlots) {
+        // Strictly prevent generating future candles on the active trading day
+        if (dateStr === todayYmd && timeSlot > currentIstTimeStr) {
+          continue;
+        }
+
         barIndex++;
         const dateTimeStr = `${dateStr}T${timeSlot}`;
-        const barDateObj = new Date(`${dateStr}T${timeSlot}Z`);
+        const barDateObj = new Date(`${dateStr}T${timeSlot}+05:30`);
 
         // Natural harmonic wave cycle without artificial plunges
         const wave = Math.sin((barIndex + stock.symbol.charCodeAt(0)) / 14);

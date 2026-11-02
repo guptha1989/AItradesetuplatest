@@ -429,6 +429,18 @@ export default function InteractiveChartTile({
         timeVisible: true,
         secondsVisible: false,
         shiftVisibleRangeOnNewBar: true,
+        tickMarkFormatter: (time, tickMarkType) => {
+          const d = new Date(time * 1000);
+          if (tickMarkType === 0) {
+            return d.toLocaleDateString('en-IN', { year: 'numeric', timeZone: 'Asia/Kolkata' });
+          } else if (tickMarkType === 1) {
+            return d.toLocaleDateString('en-IN', { month: 'short', timeZone: 'Asia/Kolkata' });
+          } else if (tickMarkType === 2) {
+            return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', timeZone: 'Asia/Kolkata' });
+          } else {
+            return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Kolkata' });
+          }
+        },
       },
       localization: {
         dateFormat: "dd MMM 'yy",
@@ -789,12 +801,38 @@ export default function InteractiveChartTile({
 
     const intervalSec = TF_SECONDS[timeframe] || 300;
     const tickTimestamp = Number(lastTick.timestamp) || Math.floor(Date.now() / 1000);
-    const currentBucketTime = Math.floor(tickTimestamp / intervalSec) * intervalSec;
-
     const lastCandle = currCandles[currCandles.length - 1];
 
-    if (lastCandle && (lastCandle.time === currentBucketTime || currentBucketTime <= lastCandle.time)) {
-      // Dynamic intra-candle tick update
+    if (!lastCandle) return;
+
+    if (tickTimestamp >= lastCandle.time + intervalSec) {
+      // Current interval ended; roll over to new forming candle
+      const steps = Math.floor((tickTimestamp - lastCandle.time) / intervalSec);
+      const newCandleTime = lastCandle.time + (steps * intervalSec);
+
+      const newCandle = {
+        time: newCandleTime,
+        open: tickPrice,
+        high: tickPrice,
+        low: tickPrice,
+        close: tickPrice,
+        volume: 500,
+      };
+      currCandles.push(newCandle);
+
+      try {
+        candleSeriesRef.current.update(newCandle);
+        if (volumeSeriesRef.current) {
+          const activePalette = COLOR_THEMES[selectedTheme] || COLOR_THEMES.dhan;
+          volumeSeriesRef.current.update({
+            time: newCandle.time,
+            value: newCandle.volume,
+            color: `${activePalette.bull}55`,
+          });
+        }
+      } catch (err) {}
+    } else {
+      // Intra-candle live update for active bar
       const updatedCandle = {
         time: lastCandle.time,
         open: lastCandle.open,
@@ -814,29 +852,6 @@ export default function InteractiveChartTile({
             time: updatedCandle.time,
             value: updatedCandle.volume,
             color: isBull ? `${activePalette.bull}55` : `${activePalette.bear}55`,
-          });
-        }
-      } catch (err) {}
-    } else if (!lastCandle || currentBucketTime > lastCandle.time) {
-      // Rollover to brand new forming candle bar
-      const newCandle = {
-        time: currentBucketTime,
-        open: tickPrice,
-        high: tickPrice,
-        low: tickPrice,
-        close: tickPrice,
-        volume: 500,
-      };
-      currCandles.push(newCandle);
-
-      try {
-        candleSeriesRef.current.update(newCandle);
-        if (volumeSeriesRef.current) {
-          const activePalette = COLOR_THEMES[selectedTheme] || COLOR_THEMES.dhan;
-          volumeSeriesRef.current.update({
-            time: newCandle.time,
-            value: newCandle.volume,
-            color: `${activePalette.bull}55`,
           });
         }
       } catch (err) {}

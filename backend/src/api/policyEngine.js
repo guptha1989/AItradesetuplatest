@@ -528,11 +528,17 @@ class PolicyEngine {
   }
 
   getAlerts(limit = 500, months = 6) {
+    const now = Date.now();
+    let res = (this.alerts || []).filter(a => {
+      const ts = new Date(a.timestamp || a.exactTriggerTime).getTime();
+      return !isNaN(ts) && ts <= (now + 60000); // Strictly block any future alert
+    });
+
     if (months) {
-      const cutoff = Date.now() - (months * 31 * 24 * 60 * 60 * 1000);
-      return this.alerts.filter(a => new Date(a.timestamp).getTime() >= cutoff).slice(0, limit);
+      const cutoff = now - (months * 31 * 24 * 60 * 60 * 1000);
+      res = res.filter(a => new Date(a.timestamp).getTime() >= cutoff);
     }
-    return this.alerts.slice(0, limit);
+    return res.slice(0, limit);
   }
 
   clearAlerts() {
