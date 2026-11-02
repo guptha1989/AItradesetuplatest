@@ -198,24 +198,24 @@ cron.schedule('17 9 * * 1-5', async () => {
 }, { timezone: 'Asia/Kolkata' });
 
 /**
- * 15:35 IST daily: EOD summary
+ * 15:42 IST daily: EOD summary for NSE/BSE (after 15:40 close)
  */
-cron.schedule('35 15 * * 1-5', async () => {
-  logger.info('Running EOD summary...');
+cron.schedule('42 15 * * 1-5', async () => {
+  logger.info('Running EOD summary for NSE & BSE...');
   wsServer.broadcast('ALERT_FEED', {
     level: 'INFO',
-    message: 'Market closed. EOD summary generating...',
+    message: 'NSE & BSE markets closed (15:40 IST). EOD summary generating... (MCX remains open until 23:30 IST)',
   });
 }, { timezone: 'Asia/Kolkata' });
 
 /**
- * Every week Thursday at 15:30:15 IST (Weekly Expiry Market Rollover):
+ * Every week Thursday at 15:40:15 IST (NSE/BSE Weekly Expiry Market Rollover):
  * Automatically pull and store updated contract data from Dhan API for all required instruments
  */
-cron.schedule('30 15 * * 4', async () => {
+cron.schedule('40 15 * * 4', async () => {
   try {
     const { refreshContractDataForRequiredInstruments } = require('./api/dhan/dhanClient');
-    logger.info('🔔 [Thursday 15:30 IST] Weekly Expiry Market Rollover triggered — pulling updated contracts for all instruments...');
+    logger.info('🔔 [Thursday 15:40 IST] Weekly Expiry Market Rollover triggered — pulling updated contracts for all instruments...');
     const result = await refreshContractDataForRequiredInstruments();
     wsServer.broadcast('ALERT_FEED', {
       level: 'INFO',
@@ -224,6 +224,17 @@ cron.schedule('30 15 * * 4', async () => {
   } catch (err) {
     logger.error('Thursday contract rollover job failed:', err.message);
   }
+}, { timezone: 'Asia/Kolkata' });
+
+/**
+ * 23:30 IST daily: MCX Market Closure
+ */
+cron.schedule('30 23 * * 1-5', async () => {
+  logger.info('MCX Market closed (23:30 IST)...');
+  wsServer.broadcast('ALERT_FEED', {
+    level: 'INFO',
+    message: 'MCX Commodities market closed for the day (23:30 IST).',
+  });
 }, { timezone: 'Asia/Kolkata' });
 
 // Periodic memory garbage collection guard

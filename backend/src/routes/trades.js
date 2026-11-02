@@ -158,8 +158,8 @@ async function getDhanLiveTrades() {
         qty,
         entry_price: p.buyAvg || p.costPrice,
         exit_price: p.sellAvg || p.costPrice,
-        entry_time: p.drvExpiryDate || '30 Oct 2026, 03:30 PM',
-        exit_time: p.positionType === 'CLOSED' ? '30 Oct 2026, 03:30 PM' : null,
+        entry_time: p.drvExpiryDate || `${getTodayDateStr()}, 03:40 PM`,
+        exit_time: p.positionType === 'CLOSED' ? `${getTodayDateStr()}, 03:40 PM` : null,
         status: p.positionType || (p.netQty === 0 ? 'CLOSED' : 'OPEN'),
         pnl,
         net_pnl: pnl - charges,
@@ -181,7 +181,7 @@ async function getDhanLiveOrders() {
     const list = Array.isArray(rawOrders) ? rawOrders : (rawOrders?.data || []);
     return list.map(o => ({
       id: String(o.orderId),
-      time: o.createTime || o.orderDateTime || '30 Oct 2026, 03:30 PM',
+      time: o.createTime || o.orderDateTime || `${getTodayDateStr()}, 03:40 PM`,
       symbol: o.tradingSymbol,
       underlying: o.tradingSymbol?.split(' ')?.[0] || 'NIFTY',
       strike: o.strikePrice || 0,

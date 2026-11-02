@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { formatIstDateTime, getTodayDateStr } = require('../utils/dateHelper');
+const { getMarketHours } = require('../utils/marketHours');
 
 let oiAnalysisCache = { key: null, data: null, expiresAt: 0 };
 
@@ -84,8 +85,9 @@ router.get('/analysis', async (req, res) => {
     selectedStrikes.sort((a, b) => a - b);
 
     const istInfo = getISTTimeInfo();
-    const marketCloseMins = 15 * 60 + 30; // 15:30 IST
-    const startMins = 9 * 60 + 15;        // 09:15 IST
+    const hours = getMarketHours(meta.exchange || symbol);
+    const marketCloseMins = hours.closeMins;
+    const startMins = hours.openMins;
     const effectiveMins = Math.min(marketCloseMins, Math.max(startMins, istInfo.mins));
     const maxCur = mode === 'live' ? effectiveMins : marketCloseMins;
 

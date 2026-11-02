@@ -5,6 +5,7 @@ const { getOptionChain, getRealDhanExpiry, SCRIP_MAP } = require('../api/dhan/dh
 const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const logger = require('../utils/logger');
 const { formatIstDateTime } = require('../utils/dateHelper');
+const { getMarketHours } = require('../utils/marketHours');
 
 // Friday 30 Oct 2026 Verified Dhan API Closing Prices Master
 const INSTRUMENT_MASTER = {
@@ -103,27 +104,28 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
   strikes.sort((a, b) => a - b);
   const minStrike = strikes[0];
   const maxStrike = strikes[strikes.length - 1];
+  const hours = getMarketHours(meta.exchange || symbol);
 
   // Resolve current IST Dhan Market Time to prevent plotting future points in live mode
   const now = new Date();
   const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
   const istDate = new Date(utcMs + (330 * 60000));
   const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
-  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
-  const marketCloseMins = 15 * 60 + 30; // 03:30 PM
+  const marketOpenMins = hours.openMins;
+  const marketCloseMins = hours.closeMins;
 
   const stepMins = Math.max(1, parseInt(interval) || 1);
-  let totalMins = 375; // Full day 09:15 to 15:30
+  let totalMins = hours.totalTradingMins;
 
   const isLive = String(mode).toUpperCase() === 'LIVE';
   if (isLive) {
     if (currentIstMins <= marketOpenMins) {
       totalMins = stepMins;
     } else if (currentIstMins >= marketCloseMins) {
-      totalMins = 375;
+      totalMins = hours.totalTradingMins;
     } else {
       // In live market hours: clamp strictly to elapsed minutes up to now
-      totalMins = Math.min(375, Math.max(stepMins, currentIstMins - marketOpenMins));
+      totalMins = Math.min(hours.totalTradingMins, Math.max(stepMins, currentIstMins - marketOpenMins));
     }
   }
 
@@ -161,7 +163,7 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
   const alpha = 0.12;
 
   for (let m = 0; m <= totalMins; m += stepMins) {
-    const totalMinutesFromMidnight = 9 * 60 + 15 + m;
+    const totalMinutesFromMidnight = hours.openMins + m;
     const hh = Math.floor(totalMinutesFromMidnight / 60);
     const mm = totalMinutesFromMidnight % 60;
     const ampm = hh >= 12 ? 'PM' : 'AM';
@@ -204,7 +206,7 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
       ceAvg = Number(ceAvgRunning.toFixed(3));
       peAvg = Number(peAvgRunning.toFixed(3));
     } else if (is30OctNifty) {
-      const progress = m / 375;
+      const progress = m / totalMins;
       const wave = Math.sin(progress * Math.PI * 3.2) * 45;
       const trendDrift = progress * 75;
       const thetaDecay = progress * 60;
@@ -219,7 +221,7 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
       futurePrice = Number((22965 + (m - 27) * 0.28 + wave * 0.3).toFixed(2));
     } else {
       // Live or Custom calibrated curve scaled specifically to this instrument's spot & step
-      const progress = m / 375;
+      const progress = m / totalMins;
       const symSeed = symbol.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
       const wave = Math.sin(progress * Math.PI * (2.8 + (symSeed % 3) * 0.4)) * (step * 0.75);
       const trend = (progress * (step * 1.2)) * (symSeed % 2 === 0 ? 1 : -0.8);

@@ -4,13 +4,13 @@ const { generateSignal } = require('../api/gemini/signalAnalyzer');
 const logger = require('./logger');
 
 /**
- * Replay Engine — simulates a full 375-minute trading day (09:15 to 15:30 IST).
+ * Replay Engine — simulates a full 385-minute trading day (09:15 to 15:40 IST for NSE/BSE).
  */
 class ReplayEngine {
   constructor() {
     this.status = 'STOPPED'; // 'STOPPED' | 'PLAYING' | 'PAUSED'
     this.speed = 10;          // 1x, 5x, 10x, 60x
-    this.currentMinute = 0;   // 0 to 375 (0 = 09:15, 375 = 15:30)
+    this.currentMinute = 0;   // 0 to 385 (0 = 09:15, 385 = 15:40)
     this.basePrice = 23053.10;  // Starting Nifty 50 spot from Dhan API
     this.spotPrice = 23053.10;
     this.dayHigh = 23075.40;
@@ -21,7 +21,7 @@ class ReplayEngine {
     this.generatedSignals = [];
     this.trades = [];
 
-    // Pre-generate a realistic intraday price curve (375 minutes)
+    // Pre-generate a realistic intraday price curve (385 minutes)
     this.generateTrajectory();
   }
 
@@ -39,13 +39,13 @@ class ReplayEngine {
     let price = this.basePrice || 7284.5;
     const trajectory = [price];
 
-    for (let m = 1; m <= 375; m++) {
+    for (let m = 1; m <= 385; m++) {
       let volMultiplier = 1.0;
       if (m <= 45) volMultiplier = 2.2;       // Opening volatility
       else if (m >= 315) volMultiplier = 2.5;  // Afternoon move
       else if (m >= 135 && m <= 255) volMultiplier = 0.5; // Midday lull
 
-      const wave = Math.sin((m / 375) * Math.PI * 2) * (price * 0.001);
+      const wave = Math.sin((m / 385) * Math.PI * 2) * (price * 0.001);
       const noise = (Math.random() - 0.49) * (price * 0.0015) * volMultiplier;
       price = price + wave * 0.05 + noise;
 
@@ -152,10 +152,10 @@ class ReplayEngine {
    * Advance replay by 1 minute step
    */
   async step() {
-    if (this.currentMinute >= 375) {
+    if (this.currentMinute >= 385) {
       this.pause();
       this.status = 'COMPLETED';
-      logger.info('Replay session completed (15:30 IST)');
+      logger.info('Replay session completed (15:40 IST)');
       return;
     }
 

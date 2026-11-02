@@ -4,6 +4,7 @@ const { UNIVERSE_STOCKS } = require('../utils/universeConstituents');
 const { liveEngine } = require('../api/dhan/liveEngine');
 const { getOptionChain } = require('../api/dhan/dhanClient');
 const logger = require('../utils/logger');
+const { getMarketHours } = require('../utils/marketHours');
 
 // Cache for OI Crossover
 let crossoverCache = { data: null, expiresAt: 0 };
@@ -132,12 +133,14 @@ function calculateInstrumentOICrossover(item, baseSpot = null, atmRange = 4) {
   const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
   const istDate = new Date(utcMs + (330 * 60000));
   const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
-  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
+  const hours = getMarketHours(item.exchange || item.sector || item.symbol);
+  const marketOpenMins = hours.openMins;
   const dateFormatted = istDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   
-  // Elapsed trading minutes today (e.g. from 09:15 AM up to current time, strictly capped to market hours)
-  // If tested around midday (12:16 PM), elapsed is ~180 mins.
-  const maxAllowedMins = currentIstMins >= (15 * 60 + 30) ? 375 : Math.max(5, Math.min(375, currentIstMins - marketOpenMins));
+  // Elapsed trading minutes today (strictly capped to exchange market hours)
+  const maxAllowedMins = currentIstMins >= hours.closeMins 
+    ? hours.totalTradingMins 
+    : Math.max(5, Math.min(hours.totalTradingMins, currentIstMins - marketOpenMins));
   
   // Crossover minute occurs between 5 minutes after open and current minute (never in future!)
   const crossOffset = 5 + ((seedNum * 13) % Math.max(1, maxAllowedMins - 5));

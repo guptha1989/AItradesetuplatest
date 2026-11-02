@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { wsServer } = require('../websocket/wsServer');
 const config = require('../config/env');
 const logger = require('../utils/logger');
+const { isMarketOpen, getMarketHours } = require('../utils/marketHours');
 
 /**
  * Risk Manager — enforces all risk guardrails before any order is placed.
@@ -57,9 +58,10 @@ class RiskManager {
       return { allowed: true, reason: 'Paper trading mode' };
     }
 
-    // 3. Market hours check (09:15 – 15:30 IST)
-    if (!this._isMarketHours()) {
-      return { allowed: false, reason: 'Outside market hours (09:15-15:30 IST)' };
+    // 3. Market hours check (MCX: 09:00 - 23:30 IST; NSE/BSE: 09:15 - 15:40 IST)
+    if (!this._isMarketHours(order.symbol)) {
+      const hours = getMarketHours(order.symbol);
+      return { allowed: false, reason: `Outside market hours (${hours.openLabel} - ${hours.closeLabel} IST for ${hours.exchange})` };
     }
 
     // 4. Max daily loss check
@@ -117,12 +119,8 @@ class RiskManager {
     wsServer.alert('INFO', 'Trading resumed');
   }
 
-  _isMarketHours() {
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const ist = new Date(now.getTime() + istOffset);
-    const hhmm = ist.getUTCHours() * 100 + ist.getUTCMinutes();
-    return hhmm >= 915 && hhmm <= 1530;
+  _isMarketHours(symbol = 'NSE') {
+    return isMarketOpen(symbol);
   }
 
   _isExpiryDay() {

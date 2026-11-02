@@ -3,6 +3,7 @@ import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, Tooltip, 
 import { useTradingStore } from '../store/tradingStore';
 import toast from 'react-hot-toast';
 import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
+import { getMarketHours } from '../utils/marketHours';
 
 // Friday 30 Oct 2026 Closing Instruments Master (Dhan API Verified)
 const ALL_INSTRUMENTS = [
@@ -97,18 +98,19 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
   const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
   const istDate = new Date(utcMs + (330 * 60000));
   const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
-  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
-  const marketCloseMins = 15 * 60 + 30; // 03:30 PM
+  const hours = getMarketHours(meta.category?.includes('MCX') ? 'MCX' : symbol);
+  const marketOpenMins = hours.openMins;
+  const marketCloseMins = hours.closeMins;
 
-  let totalMins = 375;
+  let totalMins = hours.totalTradingMins;
   const isLive = String(mode).toUpperCase() === 'LIVE';
   if (isLive) {
     if (currentIstMins <= marketOpenMins) {
       totalMins = 1;
     } else if (currentIstMins >= marketCloseMins) {
-      totalMins = 375;
+      totalMins = hours.totalTradingMins;
     } else {
-      totalMins = Math.min(375, Math.max(1, currentIstMins - marketOpenMins));
+      totalMins = Math.min(hours.totalTradingMins, Math.max(1, currentIstMins - marketOpenMins));
     }
   }
 
@@ -124,7 +126,7 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
   const alpha = 0.12;
 
   for (let m = 0; m <= totalMins; m += 1) {
-    const totalMinutesFromMidnight = 9 * 60 + 15 + m;
+    const totalMinutesFromMidnight = hours.openMins + m;
     const hh = Math.floor(totalMinutesFromMidnight / 60);
     const mm = totalMinutesFromMidnight % 60;
     const ampm = hh >= 12 ? 'PM' : 'AM';
@@ -167,7 +169,7 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
       ceAvg = Number(ceAvgRunning.toFixed(3));
       peAvg = Number(peAvgRunning.toFixed(3));
     } else if (is30OctNifty) {
-      const progress = m / 375;
+      const progress = m / totalMins;
       const wave = Math.sin(progress * Math.PI * 3.2) * 45;
       const trendDrift = progress * 75;
       const thetaDecay = progress * 60;
@@ -182,7 +184,7 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
       futurePrice = Number((22965 + (m - 27) * 0.28 + wave * 0.3).toFixed(2));
     } else {
       // Uniquely scaled curve based on this instrument's spot, step and volatility
-      const progress = m / 375;
+      const progress = m / totalMins;
       const symSeed = symbol.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
       const wave = Math.sin(progress * Math.PI * (2.8 + (symSeed % 3) * 0.4)) * (step * 0.75);
       const trend = (progress * (step * 1.2)) * (symSeed % 2 === 0 ? 1 : -0.8);
@@ -816,7 +818,7 @@ export default function PremiumDecayView() {
                 {symbol} Spot: ₹{currentSpot?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
               <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                Base 9:15 Open (CE/PE Change: 0 pts) • Realtime ATM: <strong style={{ color: '#2563eb' }}>{currentATM}</strong> • ATM ± {atmRange} Strikes ({currentRange})
+                Base {getMarketHours(selectedInst.category?.includes('MCX') ? 'MCX' : symbol).openLabel} Open (CE/PE Change: 0 pts) • Realtime ATM: <strong style={{ color: '#2563eb' }}>{currentATM}</strong> • ATM ± {atmRange} Strikes ({currentRange})
               </span>
             </div>
 

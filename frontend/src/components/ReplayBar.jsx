@@ -99,12 +99,12 @@ export default function ReplayBar() {
               <span>09:15</span>
               <span>11:30</span>
               <span>13:30</span>
-              <span>15:30</span>
+              <span>15:40</span>
             </div>
             <input
               type="range"
               min="0"
-              max="375"
+              max="385"
               value={replayMinute}
               onChange={handleSliderChange}
               style={{

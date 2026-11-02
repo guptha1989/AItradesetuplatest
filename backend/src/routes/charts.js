@@ -3,6 +3,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const { liveEngine } = require('../api/dhan/liveEngine');
 const { formatIstDateTime } = require('../utils/dateHelper');
+const { getMarketHours, getElapsedMinsToday, getExchangeForSymbol } = require('../utils/marketHours');
 
 // Master spot & volatility prices for Friday 30 Oct session across MCX, NSE, BSE
 const BASE_PRICES = {
@@ -109,11 +110,12 @@ function generateCandles(symbol = 'NIFTY', timeframe = '5m', requestedDays = 15)
 
   const candles = [];
   let runningClose = baseSpot * (1 - vol * 1.8);
+  const hours = getMarketHours(meta.exchange || symbol);
 
   // Daily mode
   if (tfMins === '1D' || tfMins === '1W' || tfMins === '1M') {
     activeDays.forEach((dateStr, dIdx) => {
-      const dateObj = new Date(`${dateStr}T15:30:00+05:30`);
+      const dateObj = new Date(`${dateStr}T${hours.closeTimeStr}+05:30`);
       const timeSec = Math.floor(dateObj.getTime() / 1000);
       const progress = dIdx / activeDays.length;
 
@@ -139,14 +141,14 @@ function generateCandles(symbol = 'NIFTY', timeframe = '5m', requestedDays = 15)
 
   // Intraday mode (1m to 4h)
   const stepMins = typeof tfMins === 'number' ? tfMins : 5;
-  const totalMinsPerDay = 375; // 09:15 to 15:30 is exactly 375 minutes
+  const totalMinsPerDay = hours.totalTradingMins;
 
   // Calculate current elapsed trading minutes if today is the active day
   const now = new Date();
   const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
   const todayYmd = `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, '0')}-${String(istNow.getDate()).padStart(2, '0')}`;
   const istMinutesFromMidnight = istNow.getHours() * 60 + istNow.getMinutes();
-  const istMinutesElapsedToday = istMinutesFromMidnight - (9 * 60 + 15);
+  const istMinutesElapsedToday = istMinutesFromMidnight - hours.openMins;
 
   activeDays.forEach((dateStr, dIdx) => {
     const isToday = dateStr === todayYmd;
@@ -157,7 +159,7 @@ function generateCandles(symbol = 'NIFTY', timeframe = '5m', requestedDays = 15)
         // Market hasn't opened today yet; show up to 1st bar
         minsForThisDay = stepMins;
       } else if (istMinutesElapsedToday >= totalMinsPerDay) {
-        // Market closed today; show all 375 minutes
+        // Market closed today; show all daily minutes
         minsForThisDay = totalMinsPerDay;
       } else {
         // Currently in market hours: show bars up to current interval
@@ -169,7 +171,7 @@ function generateCandles(symbol = 'NIFTY', timeframe = '5m', requestedDays = 15)
     const dayBase = baseSpot * (0.94 + dayProgress * 0.06);
 
     for (let m = 0; m < minsForThisDay; m += stepMins) {
-      const totalMinutesFromMidnight = 9 * 60 + 15 + m;
+      const totalMinutesFromMidnight = hours.openMins + m;
       const hh = Math.floor(totalMinutesFromMidnight / 60);
       const mm = totalMinutesFromMidnight % 60;
       const timeStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;

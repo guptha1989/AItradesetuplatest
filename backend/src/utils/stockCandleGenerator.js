@@ -1,4 +1,5 @@
 const { aggregateCandles } = require('./candleAggregator');
+const { getMarketHours } = require('./marketHours');
 /**
  * Stock Candle Generator
  * Synthesizes realistic historical candles for any stock/instrument
@@ -47,13 +48,21 @@ function generateStockCandles(stock, fromDate, toDate, timeframe = '5m') {
   const isHigher = ['1W', '1M', '3M', '1Y'].includes(timeframe.toUpperCase());
   const isDaily = timeframe.toUpperCase() === '1D' || isHigher;
 
-  // Intraday bar time slots (NSE market hours: 09:15 AM to 03:30 PM)
-  const intradaySlots = isDaily
-    ? ['09:15:00']
-    : [
-        '09:15:00', '09:45:00', '10:15:00', '10:45:00', '11:30:00',
-        '12:15:00', '13:00:00', '13:45:00', '14:30:00', '15:15:00',
-      ];
+  const hours = getMarketHours(stock.exchange || stock.symbol);
+
+  // Intraday bar time slots (MCX: 09:00 to 23:30; NSE/BSE: 09:15 to 15:40)
+  let intradaySlots = [];
+  if (isDaily) {
+    intradaySlots = [hours.openTimeStr];
+  } else {
+    // Standard 30-45m sample slots scaled across active session
+    const step = hours.exchange === 'MCX' ? 45 : 35;
+    for (let m = hours.openMins; m <= hours.closeMins; m += step) {
+      const hh = Math.floor(m / 60);
+      const mm = m % 60;
+      intradaySlots.push(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`);
+    }
+  }
 
   const candles = [];
   let currentPrice = basePrice * (0.92 + (Math.sin(stock.symbol.length) * 0.05));

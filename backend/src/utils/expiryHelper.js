@@ -6,7 +6,7 @@
  * - Current Month: Last Thursday of Current Month (e.g. 26 Nov 2026)
  * - Next Month: Last Thursday of Next Month (e.g. 31 Dec 2026)
  * 
- * Auto-rollover occurs every Thursday at 15:30 IST (market close).
+ * Auto-rollover occurs every Thursday at 15:40 IST (market close).
  */
 
 function getThursdayExpiries(refDate = new Date()) {
@@ -20,8 +20,8 @@ function getThursdayExpiries(refDate = new Date()) {
   
   // Days to upcoming Thursday (day 4)
   let daysToThu = (4 - day + 7) % 7;
-  // If today is Thursday after 15:30 IST market close, advance to next week
-  if (daysToThu === 0 && (hh > 15 || (hh === 15 && mm >= 30))) {
+  // If today is Thursday after 15:40 IST market close, advance to next week
+  if (daysToThu === 0 && (hh > 15 || (hh === 15 && mm >= 40))) {
     daysToThu = 7;
   }
   
