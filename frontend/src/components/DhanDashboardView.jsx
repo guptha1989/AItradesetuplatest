@@ -57,7 +57,7 @@ export default function DhanDashboardView() {
     fetchDhanDashboard();
     const timer = setInterval(() => {
       fetchDhanDashboard();
-    }, 30000);
+    }, 10000);
     return () => clearInterval(timer);
   }, [symbol, selectedExpiry, optionType, strikeFilter, instrumentType]);
 

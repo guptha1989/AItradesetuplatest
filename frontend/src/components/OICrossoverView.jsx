@@ -72,7 +72,7 @@ export default function OICrossoverView() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 4000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [mode, sectorFilter, crossoverFilter, atmRange]);
 

@@ -113,7 +113,11 @@ export default function OptionChainView() {
 
   useEffect(() => {
     fetchChain();
-  }, [symbol, timeframe]);
+    if (autoRefresh) {
+      const interval = setInterval(fetchChain, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [symbol, timeframe, autoRefresh]);
 
   const stepSize = symbol === 'BANKNIFTY' || symbol === 'SENSEX' ? 100 : (symbol === 'MIDCPNIFTY' ? 25 : (symbol === 'RELIANCE' ? 20 : (symbol === 'HDFCBANK' ? 10 : 50)));
   const effectiveSpot = (symbol === 'NIFTY' ? (storeSpot || spotPrice || 23053.10) : (spotPrice || (symbol === 'BANKNIFTY' ? 54686.95 : (symbol === 'SENSEX' ? 74459.53 : 24712.20))));
@@ -369,7 +373,7 @@ export default function OptionChainView() {
       <div style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', display: 'flex', gap: '24px' }}>
         <span>BEP (Break Even Price) = (CE LTP + PE LTP) / 2</span>
         <span>OI Change % calculated vs {timeframe}min ago snapshot</span>
-        <span>Auto-refresh: every {timeframe} min</span>
+        <span>Auto-refresh: every 10 seconds</span>
       </div>
     </div>
   );

@@ -171,8 +171,14 @@ export default function Dashboard() {
   const [alertPage, setAlertPage] = useState(1);
 
   useEffect(() => {
+    fetchLiveData();
     fetchPolicyAlerts(6, 500);
     fetchSavedPolicies();
+    const interval = setInterval(() => {
+      fetchLiveData();
+      fetchPolicyAlerts(6, 500);
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const winRate = (winningTrades + losingTrades) > 0

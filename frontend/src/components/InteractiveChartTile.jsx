@@ -47,6 +47,24 @@ export const ZERODHA_TIMEFRAMES = [
   { id: '1M', label: '1 Month' },
 ];
 
+const TF_SECONDS = {
+  '1m': 60,
+  '2m': 120,
+  '3m': 180,
+  '4m': 240,
+  '5m': 300,
+  '10m': 600,
+  '15m': 900,
+  '30m': 1800,
+  '1h': 3600,
+  '2h': 7200,
+  '3h': 10800,
+  '4h': 14400,
+  '1D': 86400,
+  '1W': 604800,
+  '1M': 2592000,
+};
+
 // Supported Instruments (MCX, NSE, BSE - Dhan API Verified)
 export const CHART_INSTRUMENTS = [
   { id: 'NIFTY', name: 'NIFTY 50', exchange: 'NSE', spot: 23053.10, step: 50, lotSize: 25 },
@@ -103,8 +121,8 @@ export default function InteractiveChartTile({
   const [candles, setCandles] = useState([]);
   const [hoverBar, setHoverBar] = useState(null);
 
-  // Global Theme from Store (defaults to light clean white)
-  const { theme } = useTradingStore();
+  // Global Theme & Realtime Ticks from Store
+  const { theme, spot, lastTick, ticks } = useTradingStore();
   const isWhiteTheme = theme === 'light';
 
   // Broker Candlestick Theme Selection
@@ -134,6 +152,7 @@ export default function InteractiveChartTile({
   const candleSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
   const markersRef = useRef(null);
+  const candlesRef = useRef([]);
 
   // Indicator Series References
   const ema9SeriesRef = useRef(null);
@@ -154,6 +173,7 @@ export default function InteractiveChartTile({
       const res = await fetch(`/api/charts/candles?symbol=${symbol}&timeframe=${timeframe}&days=15`).then(r => r.json());
       if (res && res.candles && res.candles.length > 0) {
         setCandles(res.candles);
+        candlesRef.current = [...res.candles];
       }
     } catch (e) {
       console.error('Fetch candles error:', e);
@@ -162,16 +182,19 @@ export default function InteractiveChartTile({
 
   useEffect(() => {
     fetchCandles();
-    const interval = setInterval(fetchCandles, 2500);
+    // Background reconciliation every 60s without disrupting realtime tick streaming
+    const interval = setInterval(fetchCandles, 60000);
     return () => clearInterval(interval);
   }, [symbol, timeframe]);
 
   // Transform data according to chart type (Heikin-Ashi / Renko)
   const displayCandles = useMemo(() => {
     if (!candles || candles.length === 0) return [];
-    if (chartType === 'heikinashi') return calculateHeikinAshi(candles);
-    if (chartType === 'renko') return calculateRenko(candles, Math.max(0.2, Math.round(instMeta.step * 0.4)));
-    return candles;
+    let res = candles;
+    if (chartType === 'heikinashi') res = calculateHeikinAshi(candles);
+    else if (chartType === 'renko') res = calculateRenko(candles, Math.max(0.2, Math.round(instMeta.step * 0.4)));
+    candlesRef.current = [...res];
+    return res;
   }, [candles, chartType, instMeta.step]);
 
   // Compute Active Indicators using Dynamic Settings
@@ -639,6 +662,7 @@ export default function InteractiveChartTile({
     }
 
     candleSeriesRef.current.setData(validCandles);
+    candlesRef.current = [...validCandles];
     if (volumeSeriesRef.current) {
       volumeSeriesRef.current.setData(validVolume);
     }
@@ -749,6 +773,76 @@ export default function InteractiveChartTile({
     }
   }, [displayCandles, indicatorSettings, indicatorSeries, selectedTheme, computedMarkers]);
 
+  // ─── Tick-by-Tick Live Real-Time Candle Updates ───
+  useEffect(() => {
+    if (!lastTick || !candleSeriesRef.current) return;
+
+    // Check if this tick corresponds to active symbol
+    const tickSym = lastTick.symbol || 'NIFTY';
+    if (tickSym !== symbol && !(symbol === 'NIFTY' && !lastTick.symbol)) return;
+
+    const tickPrice = Number(lastTick.ltp || (symbol === 'NIFTY' ? spot : null));
+    if (!tickPrice || isNaN(tickPrice)) return;
+
+    const currCandles = candlesRef.current;
+    if (!currCandles || currCandles.length === 0) return;
+
+    const intervalSec = TF_SECONDS[timeframe] || 300;
+    const tickTimestamp = Number(lastTick.timestamp) || Math.floor(Date.now() / 1000);
+    const currentBucketTime = Math.floor(tickTimestamp / intervalSec) * intervalSec;
+
+    const lastCandle = currCandles[currCandles.length - 1];
+
+    if (lastCandle && (lastCandle.time === currentBucketTime || currentBucketTime <= lastCandle.time)) {
+      // Dynamic intra-candle tick update
+      const updatedCandle = {
+        time: lastCandle.time,
+        open: lastCandle.open,
+        high: Math.max(lastCandle.high, tickPrice),
+        low: Math.min(lastCandle.low, tickPrice),
+        close: tickPrice,
+        volume: (lastCandle.volume || 1000) + Math.round(Math.random() * 20 + 5),
+      };
+      currCandles[currCandles.length - 1] = updatedCandle;
+
+      try {
+        candleSeriesRef.current.update(updatedCandle);
+        if (volumeSeriesRef.current) {
+          const isBull = updatedCandle.close >= updatedCandle.open;
+          const activePalette = COLOR_THEMES[selectedTheme] || COLOR_THEMES.dhan;
+          volumeSeriesRef.current.update({
+            time: updatedCandle.time,
+            value: updatedCandle.volume,
+            color: isBull ? `${activePalette.bull}55` : `${activePalette.bear}55`,
+          });
+        }
+      } catch (err) {}
+    } else if (!lastCandle || currentBucketTime > lastCandle.time) {
+      // Rollover to brand new forming candle bar
+      const newCandle = {
+        time: currentBucketTime,
+        open: tickPrice,
+        high: tickPrice,
+        low: tickPrice,
+        close: tickPrice,
+        volume: 500,
+      };
+      currCandles.push(newCandle);
+
+      try {
+        candleSeriesRef.current.update(newCandle);
+        if (volumeSeriesRef.current) {
+          const activePalette = COLOR_THEMES[selectedTheme] || COLOR_THEMES.dhan;
+          volumeSeriesRef.current.update({
+            time: newCandle.time,
+            value: newCandle.volume,
+            color: `${activePalette.bull}55`,
+          });
+        }
+      } catch (err) {}
+    }
+  }, [lastTick, spot, symbol, timeframe, selectedTheme]);
+
   // Handle Instant Buy / Sell on chart
   const handleChartTrade = async (action = 'BUY') => {
     setIsOrdering(true);
@@ -844,10 +938,11 @@ export default function InteractiveChartTile({
     if (chartRef.current) chartRef.current.timeScale().resetTimeScale();
   };
 
-  const lastBar = displayCandles[displayCandles.length - 1] || null;
-  const activeBar = hoverBar || lastBar;
-  const buyPriceDisplay = activeBar ? activeBar.close.toFixed(2) : instMeta.spot.toFixed(2);
-  const sellPriceDisplay = activeBar ? (activeBar.close * 0.999).toFixed(2) : (instMeta.spot * 0.999).toFixed(2);
+  const lastBar = candlesRef.current[candlesRef.current.length - 1] || displayCandles[displayCandles.length - 1] || null;
+  const livePrice = (symbol === 'NIFTY' ? (spot || lastBar?.close) : (ticks[symbol]?.ltp || lastBar?.close)) || instMeta.spot;
+  const activeBar = hoverBar || (lastBar ? { ...lastBar, close: Number(livePrice) } : null);
+  const buyPriceDisplay = activeBar ? Number(activeBar.close).toFixed(2) : instMeta.spot.toFixed(2);
+  const sellPriceDisplay = activeBar ? (Number(activeBar.close) * 0.999).toFixed(2) : (instMeta.spot * 0.999).toFixed(2);
   const activePalette = COLOR_THEMES[selectedTheme] || COLOR_THEMES.dhan;
 
   return (

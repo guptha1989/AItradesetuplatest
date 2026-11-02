@@ -31,6 +31,10 @@ export default function SupportResistance() {
 
   useEffect(() => {
     fetchSRData(effectiveSpotAtm, effectivePremiumStrike);
+    const interval = setInterval(() => {
+      fetchSRData(effectiveSpotAtm, effectivePremiumStrike);
+    }, 10000);
+    return () => clearInterval(interval);
   }, [calcBasis, spot, effectiveSpotAtm, effectivePremiumStrike]);
 
   const fetchSRData = async (spotAtmVal, premiumStrikeVal) => {

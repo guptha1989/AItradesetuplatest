@@ -47,6 +47,7 @@ export const useTradingStore = create((set, get) => ({
 
   // ─── Ticks ───────────────────────────────────
   ticks: {},
+  lastTick: null,
 
   // ─── Signals ─────────────────────────────────
   signals: [],
@@ -290,38 +291,51 @@ export const useTradingStore = create((set, get) => ({
 
   _handleMessage: (channel, data) => {
     switch (channel) {
-      case 'TICK_FEED':
-        if (data.type === 'TICK' || data.symbol === 'NIFTY') {
-          const ltp = data.ltp || data.spot;
-          const atm = ltp ? Math.round(ltp / 50) * 50 : get().atm;
-          set((state) => ({
-            spot: ltp || state.spot,
+      case 'TICK_FEED': {
+        const sym = data.symbol || (data.securityId === '13' ? 'NIFTY' : null);
+        const ltp = Number(data.ltp || data.spot || 0);
+        const timestamp = data.timestamp || Math.floor(Date.now() / 1000);
+        const timeStr = data.time || new Date().toLocaleTimeString('en-IN');
+
+        const tickObj = {
+          symbol: sym,
+          securityId: data.securityId,
+          ltp: ltp > 0 ? ltp : undefined,
+          spot: ltp > 0 ? ltp : undefined,
+          change: data.change,
+          changePercent: data.changePercent,
+          high: data.high,
+          low: data.low,
+          volume: data.volume,
+          timestamp,
+          time: timeStr,
+        };
+
+        const isNifty = sym === 'NIFTY' || (!sym && (data.type === 'TICK' || data.spot));
+        const atm = ltp > 0 ? Math.round(ltp / 50) * 50 : get().atm;
+
+        set((state) => ({
+          lastTick: tickObj,
+          lastWsTickTime: timeStr,
+          ...(isNifty && ltp > 0 ? {
+            spot: ltp,
             spotChange: data.change !== undefined ? data.change : state.spotChange,
             spotChangePercent: data.changePercent !== undefined ? data.changePercent : state.spotChangePercent,
-            dayHigh: data.high || Math.max(state.dayHigh, ltp || 0),
-            dayLow: data.low || Math.min(state.dayLow, ltp || Infinity),
+            dayHigh: data.high || Math.max(state.dayHigh, ltp),
+            dayLow: data.low || Math.min(state.dayLow, ltp),
             vix: data.vix || state.vix,
             atm,
-            lastWsTickTime: data.time || new Date().toLocaleTimeString('en-IN'),
             replayTime: data.time || state.replayTime,
             replayProgress: data.progressPct || state.replayProgress,
             replayMinute: data.replayMinute || state.replayMinute,
-          }));
-        } else if (data.securityId) {
-          set((state) => ({
-            ticks: {
-              ...state.ticks,
-              [data.securityId]: {
-                ltp: data.ltp,
-                change: data.change,
-                changePercent: data.changePercent,
-                oi: data.oi,
-                volume: data.volume,
-              },
-            },
-          }));
-        }
+          } : {}),
+          ticks: {
+            ...state.ticks,
+            ...((sym || data.securityId) ? { [sym || data.securityId]: tickObj } : {}),
+          },
+        }));
         break;
+      }
 
       case 'SIGNAL_FEED':
         set((state) => ({

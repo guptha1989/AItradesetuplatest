@@ -88,7 +88,7 @@ export default function TrendingOI() {
 
   useEffect(() => {
     fetchAnalysis();
-    const interval = setInterval(fetchAnalysis, 2500);
+    const interval = setInterval(fetchAnalysis, 10000);
     return () => clearInterval(interval);
   }, [atmRange, timeframe, symbol, mode]);
 

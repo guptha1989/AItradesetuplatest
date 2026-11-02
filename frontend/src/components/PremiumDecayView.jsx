@@ -317,7 +317,7 @@ export default function PremiumDecayView() {
 
   useEffect(() => {
     fetchDecayData();
-    const timer = window.setInterval(fetchDecayData, 2500);
+    const timer = window.setInterval(fetchDecayData, 10000);
     return () => window.clearInterval(timer);
   }, [symbol, expiry, timeframeInterval, atmRange, mode, historicalDate]);
 

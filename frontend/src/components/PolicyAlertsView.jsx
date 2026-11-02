@@ -47,7 +47,7 @@ export default function PolicyAlertsView() {
     const interval = setInterval(() => {
       fetchPolicyAlerts();
       fetchSavedPolicies();
-    }, 5000);
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 

@@ -146,6 +146,7 @@ class DhanWebSocket {
           changePercent,
           vix: 13.2,
           time: timestamp,
+          timestamp: Math.floor(Date.now() / 1000),
         });
       } else {
         // Option strike tick update

@@ -66,7 +66,7 @@ export default function TradeTerminalView({ initialTab = 'ORDERS' }) {
 
   useEffect(() => {
     fetchTerminalData();
-    const interval = setInterval(fetchTerminalData, 3000);
+    const interval = setInterval(fetchTerminalData, 10000);
     return () => clearInterval(interval);
   }, [tradingMode]);
 

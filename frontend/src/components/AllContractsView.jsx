@@ -55,7 +55,7 @@ export default function AllContractsView() {
     fetchContracts();
     const timer = setInterval(() => {
       fetchContracts();
-    }, 30000);
+    }, 10000);
     return () => clearInterval(timer);
   }, [symbol, selectedExpiry, optionType, strikeFilter, instrumentType]);
 

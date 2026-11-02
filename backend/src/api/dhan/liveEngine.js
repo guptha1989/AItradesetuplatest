@@ -25,6 +25,18 @@ class LiveEngine {
       chain: [],
       updatedAt: null,
     };
+    this.multiSpots = {
+      BANKNIFTY: { spot: 51820.40, prevClose: 51500.00, step: 100 },
+      FINNIFTY: { spot: 23612.30, prevClose: 23480.00, step: 50 },
+      SENSEX: { spot: 79724.12, prevClose: 79200.00, step: 100 },
+      CRUDEOIL: { spot: 5840.00, prevClose: 5810.00, step: 50 },
+      GOLD: { spot: 78450.00, prevClose: 78200.00, step: 100 },
+      SILVER: { spot: 95200.00, prevClose: 94800.00, step: 500 },
+      RELIANCE: { spot: 2980.00, prevClose: 2965.00, step: 20 },
+      TCS: { spot: 4120.00, prevClose: 4100.00, step: 50 },
+      INFY: { spot: 1820.00, prevClose: 1810.00, step: 20 },
+      HDFCBANK: { spot: 1680.00, prevClose: 1672.00, step: 10 },
+    };
   }
 
   start() {
@@ -39,8 +51,8 @@ class LiveEngine {
     // Set 15s recurring Dhan option chain sync
     this.intervalId = setInterval(() => this._poll(), this.pollIntervalMs);
 
-    // Set 1s realtime continuous tick heartbeat streaming to WebSocket
-    this.tickStreamIntervalId = setInterval(() => this._streamLiveTick(), 1000);
+    // Set 350ms realtime continuous tick heartbeat streaming to WebSocket
+    this.tickStreamIntervalId = setInterval(() => this._streamLiveTick(), 350);
   }
 
   stop() {
@@ -60,10 +72,11 @@ class LiveEngine {
     try {
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-IN');
+      const timeSec = Math.floor(now.getTime() / 1000);
 
       // Continuous realtime micro-fluctuations (±0.05 to ±0.25 pts) to keep WebSocket live
       let currentSpot = this.latestData.spot || 23053.10;
-      if (Math.random() < 0.35) {
+      if (Math.random() < 0.65) {
         const microJitter = Number(((Math.random() - 0.495) * 0.4).toFixed(2));
         currentSpot = Number((currentSpot + microJitter).toFixed(2));
         this.latestData.spot = currentSpot;
@@ -75,7 +88,7 @@ class LiveEngine {
       }
       this.latestData.updatedAt = timeStr;
 
-      // Broadcast Realtime Tick to all connected dashboard clients
+      // Broadcast Realtime NIFTY Tick to all connected dashboard clients
       wsServer.broadcast('TICK_FEED', {
         type: 'TICK',
         symbol: 'NIFTY',
@@ -88,7 +101,30 @@ class LiveEngine {
         vix: this.latestData.vix || 13.12,
         atm: this.latestData.atm,
         time: timeStr,
+        timestamp: timeSec,
       });
+
+      // Also micro-stream other key instruments randomly
+      const symbols = Object.keys(this.multiSpots);
+      const chosenSym = symbols[Math.floor(Math.random() * symbols.length)];
+      const inst = this.multiSpots[chosenSym];
+      if (inst && Math.random() < 0.5) {
+        const instJitter = Number(((Math.random() - 0.495) * (inst.step * 0.05)).toFixed(2));
+        inst.spot = Number((inst.spot + instJitter).toFixed(2));
+        const instChange = Number((inst.spot - inst.prevClose).toFixed(2));
+        const instChangePercent = Number(((instChange / inst.prevClose) * 100).toFixed(2));
+
+        wsServer.broadcast('TICK_FEED', {
+          type: 'TICK',
+          symbol: chosenSym,
+          spot: inst.spot,
+          ltp: inst.spot,
+          change: instChange,
+          changePercent: instChangePercent,
+          time: timeStr,
+          timestamp: timeSec,
+        });
+      }
 
       // Periodic check on active policy rules
       policyEngine.evaluateLive({
