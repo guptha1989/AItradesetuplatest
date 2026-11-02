@@ -60,7 +60,7 @@ export default function OICrossoverView() {
 
       if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         setData(res.data);
-        setLastUpdated(res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
         setError(null);
       }
     } catch (err) {

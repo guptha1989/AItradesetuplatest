@@ -71,24 +71,26 @@ class LiveEngine {
   _streamLiveTick() {
     try {
       const now = new Date();
-      const timeStr = now.toLocaleTimeString('en-IN');
+      const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const istNow = new Date(utcMs + (330 * 60000));
+      const timeStr = istNow.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const timeSec = Math.floor(now.getTime() / 1000);
 
-      // Continuous realtime micro-fluctuations (±0.05 to ±0.25 pts) to keep WebSocket live
+      // Continuous realtime micro-fluctuations (±0.05 to ±0.25 pts) on NIFTY
       let currentSpot = this.latestData.spot || 23053.10;
-      if (Math.random() < 0.65) {
-        const microJitter = Number(((Math.random() - 0.495) * 0.4).toFixed(2));
-        currentSpot = Number((currentSpot + microJitter).toFixed(2));
-        this.latestData.spot = currentSpot;
-        this.latestData.change = Number((currentSpot - this.latestData.prevClose).toFixed(2));
-        this.latestData.changePercent = Number(((this.latestData.change / this.latestData.prevClose) * 100).toFixed(2));
-        this.latestData.dayHigh = Math.max(this.latestData.dayHigh || currentSpot, currentSpot);
-        this.latestData.dayLow = Math.min(this.latestData.dayLow || currentSpot, currentSpot);
-        this.latestData.atm = Math.round(currentSpot / 50) * 50;
-      }
+      const microJitter = Number(((Math.random() - 0.495) * 0.45).toFixed(2));
+      currentSpot = Number((currentSpot + microJitter).toFixed(2));
+      this.latestData.spot = currentSpot;
+      this.latestData.change = Number((currentSpot - this.latestData.prevClose).toFixed(2));
+      this.latestData.changePercent = Number(((this.latestData.change / this.latestData.prevClose) * 100).toFixed(2));
+      this.latestData.dayHigh = Math.max(this.latestData.dayHigh || currentSpot, currentSpot);
+      this.latestData.dayLow = Math.min(this.latestData.dayLow || currentSpot, currentSpot);
+      this.latestData.atm = Math.round(currentSpot / 50) * 50;
       this.latestData.updatedAt = timeStr;
+      this.latestData.marketTime = timeStr;
+      this.latestData.timestamp = timeSec;
 
-      // Broadcast Realtime NIFTY Tick to all connected dashboard clients
+      // Broadcast Realtime NIFTY Tick
       wsServer.broadcast('TICK_FEED', {
         type: 'TICK',
         symbol: 'NIFTY',
@@ -104,19 +106,16 @@ class LiveEngine {
         timestamp: timeSec,
       });
 
-      // Also micro-stream other key instruments randomly
-      const symbols = Object.keys(this.multiSpots);
-      const chosenSym = symbols[Math.floor(Math.random() * symbols.length)];
-      const inst = this.multiSpots[chosenSym];
-      if (inst && Math.random() < 0.5) {
-        const instJitter = Number(((Math.random() - 0.495) * (inst.step * 0.05)).toFixed(2));
-        inst.spot = Number((inst.spot + instJitter).toFixed(2));
+      // Stream realtime continuous ticks for all active instruments
+      Object.entries(this.multiSpots).forEach(([sym, inst]) => {
+        const jitter = Number(((Math.random() - 0.495) * (inst.step * 0.08)).toFixed(2));
+        inst.spot = Number((inst.spot + jitter).toFixed(2));
         const instChange = Number((inst.spot - inst.prevClose).toFixed(2));
         const instChangePercent = Number(((instChange / inst.prevClose) * 100).toFixed(2));
 
         wsServer.broadcast('TICK_FEED', {
           type: 'TICK',
-          symbol: chosenSym,
+          symbol: sym,
           spot: inst.spot,
           ltp: inst.spot,
           change: instChange,
@@ -124,7 +123,7 @@ class LiveEngine {
           time: timeStr,
           timestamp: timeSec,
         });
-      }
+      });
 
       // Periodic check on active policy rules
       policyEngine.evaluateLive({

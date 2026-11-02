@@ -67,6 +67,21 @@ export default function TrendingOI() {
 
   const [data, setData] = useState(null);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [contractExpiries, setContractExpiries] = useState(CONTRACT_EXPIRIES);
+
+  useEffect(() => {
+    fetch(`/api/chain/expiries?symbol=${symbol}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.success && Array.isArray(res.expiries) && res.expiries.length > 0) {
+          setContractExpiries(res.expiries.map(e => ({ id: e.formatted || e.id, label: e.label })));
+          if (!expiryDate || !res.expiries.some(e => (e.formatted === expiryDate || e.id === expiryDate))) {
+            setExpiryDate(res.expiries[0].formatted || res.expiries[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [symbol]);
 
   const fetchAnalysis = async () => {
     try {
@@ -79,7 +94,7 @@ export default function TrendingOI() {
       const res = await fetch(`/api/trending-oi/analysis?${params}`).then(r => r.json());
       if (res && res.success) {
         setData(res);
-        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
       }
     } catch (err) {
       console.error('Fetch Trending OI analysis failed:', err);
@@ -403,7 +418,7 @@ export default function TrendingOI() {
                 outline: 'none',
               }}
             >
-              {CONTRACT_EXPIRIES.map(exp => (
+              {contractExpiries.map(exp => (
                 <option key={exp.id} value={exp.id}>{exp.label}</option>
               ))}
             </select>

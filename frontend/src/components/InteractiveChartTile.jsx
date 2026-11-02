@@ -1164,6 +1164,29 @@ export default function InteractiveChartTile({
             />
           </div>
 
+          {/* Real-time Tick Badge */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: isWhiteTheme ? '#f1f5f9' : '#0f172a',
+            border: `1px solid ${isWhiteTheme ? '#cbd5e1' : '#334155'}`,
+            borderRadius: '4px',
+            padding: '3px 8px',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            color: '#10b981',
+          }}>
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Tick: {lastTick?.time || new Date().toLocaleTimeString('en-IN')}</span>
+          </div>
+
           <button
             disabled={isOrdering}
             onClick={() => handleChartTrade('BUY')}

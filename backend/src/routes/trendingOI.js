@@ -139,7 +139,8 @@ router.get('/analysis', async (req, res) => {
       timeframe: tfMins,
       rows,
       asOfDate: mode === 'live' ? `${istInfo.dateStr} (Live Real-Time)` : '30 Oct 2026 (Historical EOD)',
-      timeFormatted: istInfo.timeStr,
+      timeFormatted: liveEngine?.latestData?.updatedAt || istInfo.timeStr,
+      dhanTime: liveEngine?.latestData?.updatedAt || istInfo.timeStr,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

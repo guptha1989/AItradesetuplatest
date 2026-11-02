@@ -50,7 +50,7 @@ const CONTRACT_EXPIRIES = getThursdayExpiries();
  * Supports 2, 3, 4, 5 strikes on either side + ATM (total 5, 7, 9, 11 strikes)
  * Supports live Dhan option chain strikes and Historical dates
  */
-function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4, interval = 1, histDate = null, liveChain = null) {
+function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4, interval = 1, histDate = null, liveChain = null, mode = 'LIVE') {
   const meta = INSTRUMENT_MASTER[symbol] || { spot: 23053.10, step: 50, exchange: 'NSE', lotSize: 25 };
   const spot = spotPrice || meta.spot;
   const step = meta.step;
@@ -103,9 +103,29 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
   const minStrike = strikes[0];
   const maxStrike = strikes[strikes.length - 1];
 
-  // Intraday series from 9:15 AM to 3:30 PM (375 minutes)
-  const totalMins = 375;
+  // Resolve current IST Dhan Market Time to prevent plotting future points in live mode
+  const now = new Date();
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (330 * 60000));
+  const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
+  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
+  const marketCloseMins = 15 * 60 + 30; // 03:30 PM
+
   const stepMins = Math.max(1, parseInt(interval) || 1);
+  let totalMins = 375; // Full day 09:15 to 15:30
+
+  const isLive = String(mode).toUpperCase() === 'LIVE';
+  if (isLive) {
+    if (currentIstMins <= marketOpenMins) {
+      totalMins = stepMins;
+    } else if (currentIstMins >= marketCloseMins) {
+      totalMins = 375;
+    } else {
+      // In live market hours: clamp strictly to elapsed minutes up to now
+      totalMins = Math.min(375, Math.max(stepMins, currentIstMins - marketOpenMins));
+    }
+  }
+
   const dataPoints = [];
 
   // Opening premiums for the selected strikes
@@ -128,7 +148,7 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
   }
 
   // Distinct baseline opening future for this symbol
-  const is30OctNifty = (!histDate || histDate === '2026-10-30') && symbol === 'NIFTY';
+  const is30OctNifty = (!isLive && (!histDate || histDate === '2026-10-30')) && symbol === 'NIFTY';
   const openFuture = is30OctNifty ? 22944.55 : Number((spot * 0.9992).toFixed(2));
 
   // Volatility scale for this instrument
@@ -183,7 +203,7 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
       ceAvg = Number(ceAvgRunning.toFixed(3));
       peAvg = Number(peAvgRunning.toFixed(3));
     } else if (is30OctNifty) {
-      const progress = m / totalMins;
+      const progress = m / 375;
       const wave = Math.sin(progress * Math.PI * 3.2) * 45;
       const trendDrift = progress * 75;
       const thetaDecay = progress * 60;
@@ -197,8 +217,8 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
       peAvg = Number(peAvgRunning.toFixed(3));
       futurePrice = Number((22965 + (m - 27) * 0.28 + wave * 0.3).toFixed(2));
     } else {
-      // Custom calibrated curve scaled specifically to this instrument's spot & step
-      const progress = m / totalMins;
+      // Live or Custom calibrated curve scaled specifically to this instrument's spot & step
+      const progress = m / 375;
       const symSeed = symbol.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
       const wave = Math.sin(progress * Math.PI * (2.8 + (symSeed % 3) * 0.4)) * (step * 0.75);
       const trend = (progress * (step * 1.2)) * (symSeed % 2 === 0 ? 1 : -0.8);
@@ -218,8 +238,9 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
     const totalStraddlePremium = Number((openCe + ceChange + openPe + peChange).toFixed(2));
 
     dataPoints.push({
-      time: time24,
+      time: timeFormatted,
       displayTime: timeFormatted,
+      time24,
       minute: m,
       ceChange,
       peChange,
@@ -289,7 +310,9 @@ router.get('/', async (req, res) => {
     const atmRange = parseInt(range) || 4;
     const intervalMins = parseInt(interval) || 1;
 
-    const result = generatePremiumDecaySeries(sym, spot, atmRange, intervalMins, date, liveChain);
+    const result = generatePremiumDecaySeries(sym, spot, atmRange, intervalMins, date, liveChain, mode);
+
+    const dhanTime = liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
     res.json({
       success: true,
@@ -297,7 +320,8 @@ router.get('/', async (req, res) => {
       mode: mode.toUpperCase(),
       asOfDate: mode.toUpperCase() === 'HISTORICAL' ? `${date} (Historical EOD Retained)` : `${new Date().toLocaleDateString('en-GB')} (Live Real-Time)`,
       ...result,
-      timeFormatted: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      timeFormatted: dhanTime,
+      dhanTime,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

@@ -87,11 +87,13 @@ const TIMEFRAME_MINUTES = {
 function generateCandles(symbol = 'NIFTY', timeframe = '5m', requestedDays = 15) {
   const meta = BASE_PRICES[symbol] || { name: symbol, spot: 23053.10, step: 50, vol: 0.01, exchange: 'NSE' };
   
-  // Tie spot to liveEngine latestData if NIFTY or available
+  // Tie spot to liveEngine latestData or multiSpots if available
   let baseSpot = meta.spot;
   try {
     if (symbol === 'NIFTY' && liveEngine?.latestData?.spot) {
       baseSpot = liveEngine.latestData.spot;
+    } else if (liveEngine?.multiSpots?.[symbol]?.spot) {
+      baseSpot = liveEngine.multiSpots[symbol].spot;
     }
   } catch (_) {}
 
@@ -230,6 +232,8 @@ router.get('/candles', (req, res) => {
       days: parseInt(days) || 15,
       total: candles.length,
       candles,
+      dhanTime: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
+      timeFormatted: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

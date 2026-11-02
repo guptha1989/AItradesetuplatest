@@ -1,16 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const { getOptionChain, getLTP, getNextWeeklyExpiry, tradingDaysToExpiry } = require('../api/dhan/dhanClient');
+const { getOptionChain, getLTP, getNextWeeklyExpiry, tradingDaysToExpiry, getRealDhanExpiry } = require('../api/dhan/dhanClient');
+const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const { calcGreeks, calcPCR, findATMStrike } = require('../utils/greeksCalc');
 const { tickBuffer } = require('../utils/tickBuffer');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
 
 const { replayEngine } = require('../utils/replayEngine');
-
 const { liveEngine } = require('../api/dhan/liveEngine');
 
 let chainCache = { key: null, data: null, expiresAt: 0 };
+
+// GET /api/chain/expiries — dynamic weekly & monthly Thursday expiries with Dhan API sync
+router.get('/expiries', async (req, res) => {
+  try {
+    const symbol = req.query.symbol || 'NIFTY';
+    const standardExpiries = getThursdayExpiries();
+    let dhanExpiry = null;
+    try {
+      dhanExpiry = await getRealDhanExpiry(symbol);
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      symbol,
+      expiries: standardExpiries,
+      currentWeek: standardExpiries[0],
+      nextWeek: standardExpiries[1],
+      currentMonth: standardExpiries[2],
+      nextMonth: standardExpiries[3],
+      dhanExpiry,
+      dhanTime: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error('Failed to get expiries:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // GET /api/chain — fetch full option chain for nearest expiry
 router.get('/', async (req, res) => {

@@ -60,7 +60,7 @@ const HISTORICAL_SESSIONS = [
  * and Reference Image 2 (9:42 AM) for Friday 30 Oct session, and accurately scaled
  * for each individual instrument across MCX, NSE and BSE.
  */
-function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4, histDate = '2026-10-30') {
+function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4, histDate = '2026-10-30', mode = 'LIVE') {
   const meta = ALL_INSTRUMENTS.find(i => i.id === symbol) || { spot: 23053.10, step: 50 };
   const spot = spotPrice || meta.spot;
   const step = meta.step;
@@ -91,11 +91,30 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
   const minStrike = strikes[0];
   const maxStrike = strikes[strikes.length - 1];
 
-  const totalMins = 375;
+  // Resolve current IST Dhan Market Time to prevent plotting future points in live mode
+  const now = new Date();
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (330 * 60000));
+  const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
+  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
+  const marketCloseMins = 15 * 60 + 30; // 03:30 PM
+
+  let totalMins = 375;
+  const isLive = String(mode).toUpperCase() === 'LIVE';
+  if (isLive) {
+    if (currentIstMins <= marketOpenMins) {
+      totalMins = 1;
+    } else if (currentIstMins >= marketCloseMins) {
+      totalMins = 375;
+    } else {
+      totalMins = Math.min(375, Math.max(1, currentIstMins - marketOpenMins));
+    }
+  }
+
   const dataPoints = [];
   const openCe = (spot * 0.015) * strikes.length;
   const openPe = (spot * 0.014) * strikes.length;
-  const is30OctNifty = (!histDate || histDate === '2026-10-30') && symbol === 'NIFTY';
+  const is30OctNifty = (!isLive && (!histDate || histDate === '2026-10-30')) && symbol === 'NIFTY';
   const openFuture = is30OctNifty ? 22944.55 : Number((spot * 0.9992).toFixed(2));
   const scaleRatio = step / 50;
 
@@ -147,7 +166,7 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
       ceAvg = Number(ceAvgRunning.toFixed(3));
       peAvg = Number(peAvgRunning.toFixed(3));
     } else if (is30OctNifty) {
-      const progress = m / totalMins;
+      const progress = m / 375;
       const wave = Math.sin(progress * Math.PI * 3.2) * 45;
       const trendDrift = progress * 75;
       const thetaDecay = progress * 60;
@@ -162,7 +181,7 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
       futurePrice = Number((22965 + (m - 27) * 0.28 + wave * 0.3).toFixed(2));
     } else {
       // Uniquely scaled curve based on this instrument's spot, step and volatility
-      const progress = m / totalMins;
+      const progress = m / 375;
       const symSeed = symbol.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
       const wave = Math.sin(progress * Math.PI * (2.8 + (symSeed % 3) * 0.4)) * (step * 0.75);
       const trend = (progress * (step * 1.2)) * (symSeed % 2 === 0 ? 1 : -0.8);
@@ -182,8 +201,9 @@ function buildClientDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange = 4
     const totalStraddlePremium = Number((openCe + ceChange + openPe + peChange).toFixed(2));
 
     dataPoints.push({
-      time: time24,
+      time: timeFormatted,
       displayTime: timeFormatted,
+      time24,
       minute: m,
       ceChange,
       peChange,
@@ -298,7 +318,7 @@ export default function PremiumDecayView() {
       let res = null;
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         const resp = await fetch(`/api/premium-decay?${queryParams}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (resp.ok) res = await resp.json();
@@ -306,13 +326,13 @@ export default function PremiumDecayView() {
 
       if (res && res.success && Array.isArray(res.series) && res.series.length > 0) {
         setDecayData(res);
-        setLastUpdated(res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
       } else {
-        setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate));
+        setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate, mode));
         setLastUpdated(new Date().toLocaleTimeString('en-IN'));
       }
     } catch (err) {
-      setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate));
+      setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate, mode));
       setLastUpdated(new Date().toLocaleTimeString('en-IN'));
     }
   };
@@ -854,24 +874,26 @@ export default function PremiumDecayView() {
               <ComposedChart data={series} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="ceGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#16a34a" stopOpacity={0.0} />
                   </linearGradient>
                   <linearGradient id="peGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#dc2626" stopOpacity={0.0} />
-                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0.25} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" />
-                <XAxis dataKey="displayTime" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} interval={Math.floor(series.length / 8) || 30} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}`} />
+                <XAxis dataKey="displayTime" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} interval={Math.floor(series.length / 8) || 'preserveStartEnd'} minTickGap={20} />
+                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}`} domain={['auto', 'auto']} />
                 <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={1.5} />
                 <Tooltip content={<CustomDecayTooltip />} />
-                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />}
-                <Area type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2} fill="url(#ceGradient)" dot={false} />
-                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />}
-                <Area type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2} fill="url(#peGradient)" dot={false} />
-                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />}
+                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
+                <Line type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                <Area type="monotone" dataKey="ceChange" stroke="none" fill="url(#ceGradient)" isAnimationActive={false} />
+                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
+                <Line type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                <Area type="monotone" dataKey="peChange" stroke="none" fill="url(#peGradient)" isAnimationActive={false} />
+                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

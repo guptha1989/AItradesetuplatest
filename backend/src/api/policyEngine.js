@@ -529,14 +529,43 @@ class PolicyEngine {
 
   getAlerts(limit = 500, months = 6) {
     const now = Date.now();
+    const istNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const todayYmd = `${istNow.getFullYear()}-${String(istNow.getMonth() + 1).padStart(2, '0')}-${String(istNow.getDate()).padStart(2, '0')}`;
+    const todayDayMonth = `${String(istNow.getDate()).padStart(2, '0')} Nov`;
+    const currentMins = istNow.getHours() * 60 + istNow.getMinutes();
+
     let res = (this.alerts || []).filter(a => {
-      const ts = new Date(a.timestamp || a.exactTriggerTime).getTime();
-      return !isNaN(ts) && ts <= (now + 60000); // Strictly block any future alert
+      // 1. Timestamp validation (must not be in future)
+      if (a.timestamp) {
+        const t = new Date(a.timestamp).getTime();
+        if (!isNaN(t) && t > (now + 15000)) return false;
+      }
+      
+      // 2. String timestamp validation for today's trading session
+      const triggerStr = a.exactTriggerTime || a.timeFormatted || '';
+      if (triggerStr.includes(todayYmd) || triggerStr.includes(todayDayMonth)) {
+        const match = triggerStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+        if (match) {
+          let h = parseInt(match[1], 10);
+          const m = parseInt(match[2], 10);
+          const ampm = match[3].toLowerCase();
+          if (ampm === 'pm' && h < 12) h += 12;
+          if (ampm === 'am' && h === 12) h = 0;
+          const alertMins = h * 60 + m;
+          if (alertMins > currentMins) {
+            return false; // Skip future trigger times!
+          }
+        }
+      }
+      return true;
     });
 
     if (months) {
       const cutoff = now - (months * 31 * 24 * 60 * 60 * 1000);
-      res = res.filter(a => new Date(a.timestamp).getTime() >= cutoff);
+      res = res.filter(a => {
+        const ts = new Date(a.timestamp).getTime();
+        return isNaN(ts) || ts >= cutoff;
+      });
     }
     return res.slice(0, limit);
   }

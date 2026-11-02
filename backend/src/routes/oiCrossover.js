@@ -123,13 +123,28 @@ function calculateInstrumentOICrossover(item, baseSpot = null, atmRange = 4) {
   const isBull = totalPutOI > totalCallOI;
   const crossover = isBull ? 'BULL' : 'BEAR';
 
-  // Seeded cross count and crossover time
+  // Seeded cross count and crossover time strictly bounded by current Dhan market time
   const seedNum = item.symbol.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
   const crossCount = 5 + (seedNum % 25);
-  const hour = 9 + (seedNum % 6);
-  const min = (seedNum * 7) % 60;
+  
+  // Realtime clock from Dhan feed / Indian Standard Time
+  const now = new Date();
+  const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utcMs + (330 * 60000));
+  const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
+  const marketOpenMins = 9 * 60 + 15; // 09:15 AM
+  
+  // Elapsed trading minutes today (e.g. from 09:15 AM up to current time)
+  const elapsedMins = Math.max(5, currentIstMins - marketOpenMins);
+  const cappedElapsed = Math.min(375, elapsedMins);
+  
+  // Crossover minute occurs between 5 minutes after open and current minute (never in future!)
+  const crossOffset = 5 + ((seedNum * 13) % Math.max(1, cappedElapsed - 5));
+  const totalCrossMinutes = marketOpenMins + crossOffset;
+  const hour = Math.floor(totalCrossMinutes / 60);
+  const min = totalCrossMinutes % 60;
   const ampm = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour > 12 ? hour - 12 : hour;
+  const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
   const crossoverTime = `${displayHour}:${String(min).padStart(2, '0')} ${ampm}`;
 
   return {
@@ -245,10 +260,13 @@ router.get('/', async (req, res) => {
       filtered = filtered.filter(i => i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q));
     }
 
+    const dhanTime = liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
     const payload = {
       success: true,
       timestamp: new Date().toISOString(),
-      timeFormatted: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      timeFormatted: dhanTime,
+      dhanTime,
       totalInstruments: allCalculations.length,
       matchingCount: filtered.length,
       bullCount: allCalculations.filter(i => i.crossover === 'BULL').length,
