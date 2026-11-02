@@ -64,9 +64,15 @@ export default function TradeTerminalView({ initialTab = 'ORDERS' }) {
     }
   };
 
+  const [terminalLastUpdated, setTerminalLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+
   useEffect(() => {
     fetchTerminalData();
-    const interval = setInterval(fetchTerminalData, 10000);
+    setTerminalLastUpdated(new Date().toLocaleTimeString('en-IN'));
+    const interval = setInterval(() => {
+      fetchTerminalData();
+      setTerminalLastUpdated(new Date().toLocaleTimeString('en-IN'));
+    }, 10000);
     return () => clearInterval(interval);
   }, [tradingMode]);
 
@@ -173,6 +179,29 @@ export default function TradeTerminalView({ initialTab = 'ORDERS' }) {
             }}>
               {tradingMode === 'PAPER' ? '📝 PAPER MODE' : '🔴 REALTIME (DHAN HQ)'}
             </span>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.72rem',
+              color: isDark ? '#f8fafc' : '#0f172a',
+              fontWeight: 600,
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#10b981',
+                boxShadow: '0 0 6px #10b981',
+              }} />
+              <span>Last Updated: <strong>{terminalLastUpdated}</strong></span>
+              <span style={{ fontSize: '0.68rem', color: isDark ? '#94a3b8' : '#64748b' }}>(10s auto-refresh)</span>
+            </div>
           </div>
           <p style={{ margin: '4px 0 0', color: isDark ? '#94a3b8' : '#64748b', fontSize: '0.84rem' }}>
             Unified trading desk: Manage active order book, live positions, and audited historical trade journal.

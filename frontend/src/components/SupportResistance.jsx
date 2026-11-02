@@ -25,6 +25,7 @@ export default function SupportResistance() {
   const [manualPremiumInput, setManualPremiumInput] = useState('');
   const [useManualPremium, setUseManualPremium] = useState(false);
   const [appliedPremiumStrike, setAppliedPremiumStrike] = useState(null);
+  const [srLastUpdated, setSrLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
 
   const effectiveSpotAtm = (useManualSpot && appliedSpotAtm && appliedSpotAtm > 0) ? appliedSpotAtm : autoAtm;
   const effectivePremiumStrike = (useManualPremium && appliedPremiumStrike && appliedPremiumStrike > 0) ? appliedPremiumStrike : effectiveSpotAtm;
@@ -50,6 +51,7 @@ export default function SupportResistance() {
       });
       const res = await fetch(`${API_BASE}/sr?${params}`).then(r => r.json());
       setData(res);
+      setSrLastUpdated(new Date().toLocaleTimeString('en-IN'));
     } catch (err) {
       console.error('Fetch S&R failed:', err);
     } finally {
@@ -107,9 +109,33 @@ export default function SupportResistance() {
             {` | Premium Strike: ${effectivePremiumStrike}`}
           </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={() => fetchSRData(effectiveSpotAtm, effectivePremiumStrike)} disabled={loading}>
-          {loading ? '⏳' : '🔄'} Recalculate
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '0.74rem',
+            color: 'var(--color-text-primary)',
+            fontWeight: 600,
+          }}>
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Last Updated: <strong>{srLastUpdated}</strong></span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>(10s auto-refresh)</span>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => fetchSRData(effectiveSpotAtm, effectivePremiumStrike)} disabled={loading}>
+            {loading ? '⏳' : '🔄'} Recalculate
+          </button>
+        </div>
       </div>
 
       {/* Basis & Separate Manual Setting Cards */}

@@ -24,6 +24,7 @@ export default function AllContractsView() {
 
   // Default sorting state: Strike price ascending
   const [sortConfig, setSortConfig] = useState({ field: 'strike', dir: 'asc' });
+  const [contractsLastUpdated, setContractsLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
 
   const fetchContracts = async () => {
     setLoading(true);
@@ -39,6 +40,7 @@ export default function AllContractsView() {
       if (res.contracts) {
         setContracts(res.contracts);
         setParameters(res.parameters || {});
+        setContractsLastUpdated(new Date().toLocaleTimeString('en-IN'));
         if (res.expiries && res.expiries.length > 0) {
           setExpiries(res.expiries);
           if (!selectedExpiry) setSelectedExpiry(res.expiries[0]);
@@ -164,30 +166,55 @@ export default function AllContractsView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: 'Inter, sans-serif' }}>
       
       {/* 1. Page Header Tabs */}
-      <div style={{ display: 'flex', gap: '2px', borderBottom: '1px solid var(--color-border)', paddingBottom: '2px' }}>
-        <button style={{
-          padding: '8px 20px',
-          border: 'none',
-          borderBottom: '3px solid #3b82f6',
-          background: 'transparent',
-          color: '#3b82f6',
-          fontWeight: 700,
-          fontSize: '0.9rem',
-          cursor: 'pointer',
-        }}>
-          All Contracts
-        </button>
-        <button style={{
-          padding: '8px 20px',
-          border: 'none',
-          background: 'transparent',
-          color: 'var(--color-text-muted)',
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '6px' }}>
+        <div style={{ display: 'flex', gap: '2px' }}>
+          <button style={{
+            padding: '8px 20px',
+            border: 'none',
+            borderBottom: '3px solid #3b82f6',
+            background: 'transparent',
+            color: '#3b82f6',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+          }}>
+            All Contracts
+          </button>
+          <button style={{
+            padding: '8px 20px',
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--color-text-muted)',
+            fontWeight: 600,
+            fontSize: '0.9rem',
+            cursor: 'pointer',
+          }}>
+            Historical Data
+          </button>
+        </div>
+
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '6px',
+          padding: '4px 10px',
+          fontSize: '0.74rem',
+          color: 'var(--color-text-primary)',
           fontWeight: 600,
-          fontSize: '0.9rem',
-          cursor: 'pointer',
         }}>
-          Historical Data
-        </button>
+          <span style={{
+            width: '7px',
+            height: '7px',
+            borderRadius: '50%',
+            background: '#10b981',
+            boxShadow: '0 0 6px #10b981',
+          }} />
+          <span>Last Updated: <strong>{contractsLastUpdated}</strong></span>
+          <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>(10s auto-refresh)</span>
+        </div>
       </div>
 
       {/* Triple Top Banners: 09:15 AM Day Open, 09:16 AM IST, and 09:17 AM IST Locked CE Pairs */}

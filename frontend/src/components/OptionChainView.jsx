@@ -199,11 +199,33 @@ export default function OptionChainView() {
               </button>
             ))}
           </div>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '0.78rem',
+            color: 'var(--color-text-primary)',
+            fontWeight: 600,
+          }}>
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Last Updated: <strong>{lastUpdate || 'Connecting...'}</strong></span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>(10s auto-refresh)</span>
+          </div>
           <button
             className={`btn btn-sm ${autoRefresh ? 'btn-success' : 'btn-ghost'}`}
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            {autoRefresh ? '⏸ Live' : '▶ Start'}
+            {autoRefresh ? '⏸ Live (10s)' : '▶ Start'}
           </button>
           <button className="btn btn-ghost btn-sm" onClick={fetchChain} disabled={loading}>
             🔄 {loading ? '...' : 'Refresh'}

@@ -86,13 +86,14 @@ router.get('/analysis', async (req, res) => {
     const marketCloseMins = 15 * 60 + 30; // 15:30 IST
     const startMins = 9 * 60 + 15;        // 09:15 IST
     const effectiveMins = Math.min(marketCloseMins, Math.max(startMins, istInfo.mins));
+    const maxCur = mode === 'live' ? effectiveMins : marketCloseMins;
 
-    // Generate intraday interval rows (9:15 AM to 3:30 PM)
+    // Generate intraday interval rows (up to current time in live mode)
     const rows = [];
     let prevCeOI = 1850000 * selectedStrikes.length;
     let prevPeOI = 2100000 * selectedStrikes.length;
 
-    for (let cur = startMins; cur <= marketCloseMins; cur += tfMins) {
+    for (let cur = startMins; cur <= maxCur; cur += tfMins) {
       const hh = Math.floor(cur / 60);
       const mm = cur % 60;
       const ampm = hh >= 12 ? 'PM' : 'AM';
@@ -137,7 +138,8 @@ router.get('/analysis', async (req, res) => {
       rangeStr: `${selectedStrikes[0]} - ${selectedStrikes[selectedStrikes.length - 1]}`,
       timeframe: tfMins,
       rows,
-      asOfDate: '30 Oct 2026 (Friday Closing)',
+      asOfDate: mode === 'live' ? `${istInfo.dateStr} (Live Real-Time)` : '30 Oct 2026 (Historical EOD)',
+      timeFormatted: istInfo.timeStr,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

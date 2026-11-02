@@ -25,6 +25,7 @@ export default function DhanDashboardView() {
 
   // Default sorting state: Strike price ascending
   const [sortConfig, setSortConfig] = useState({ field: 'strike', dir: 'asc' });
+  const [dhanLastUpdated, setDhanLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
 
   const fetchDhanDashboard = async () => {
     setLoading(true);
@@ -40,6 +41,7 @@ export default function DhanDashboardView() {
       if (res.contracts) {
         setContracts(res.contracts);
         setParameters(res.parameters || {});
+        setDhanLastUpdated(new Date().toLocaleTimeString('en-IN'));
         if (res.expiries && res.expiries.length > 0) {
           setExpiries(res.expiries);
           if (!selectedExpiry) setSelectedExpiry(res.expiries[0]);
@@ -172,6 +174,28 @@ export default function DhanDashboardView() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '0.74rem',
+            color: 'var(--color-text-primary)',
+            fontWeight: 600,
+          }}>
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Last Updated: <strong>{dhanLastUpdated}</strong></span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>(10s auto-refresh)</span>
+          </div>
           <span style={{
             background: 'rgba(239,68,68,0.15)',
             color: '#f87171',

@@ -306,12 +306,14 @@ export default function PremiumDecayView() {
 
       if (res && res.success && Array.isArray(res.series) && res.series.length > 0) {
         setDecayData(res);
-        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
       } else {
         setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate));
+        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
       }
     } catch (err) {
       setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate));
+      setLastUpdated(new Date().toLocaleTimeString('en-IN'));
     }
   };
 
@@ -405,7 +407,10 @@ export default function PremiumDecayView() {
             <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#1e40af', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>⚙️</span> Strategy Controls
             </span>
-            <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700 }}>🟢 Dhan Real-Time Feed Active</div>
+            <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a', display: 'inline-block' }} />
+              <span>Live: {lastUpdated} (10s)</span>
+            </div>
           </div>
           <span style={{ fontSize: '0.75rem', background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '4px', fontWeight: 800 }}>
             {selectedInst.category}
@@ -816,6 +821,31 @@ export default function PremiumDecayView() {
                   <span style={{ width: '12px', height: '2px', borderTop: '2px dashed #b91c1c', display: 'inline-block' }} /> PE Avg
                 </span>
               )}
+
+              {/* Real-time Last Updated Badge */}
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: '#f8fafc',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                padding: '3px 8px',
+                fontSize: '0.73rem',
+                color: '#334155',
+                fontWeight: 600,
+                marginLeft: '8px',
+              }}>
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#10b981',
+                  boxShadow: '0 0 6px #10b981',
+                }} />
+                <span>Last Updated: <strong style={{ color: '#0f172a' }}>{lastUpdated}</strong></span>
+                <span style={{ fontSize: '0.68rem', color: '#64748b' }}>(10s auto-refresh)</span>
+              </div>
             </div>
           </div>
 

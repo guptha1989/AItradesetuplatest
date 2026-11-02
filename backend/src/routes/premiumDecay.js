@@ -280,7 +280,12 @@ router.get('/', async (req, res) => {
       logger.warn(`Dhan Option chain fetch fallback for ${sym}: ${e.message}`);
     }
 
-    const spot = liveChain?.spot || meta.spot;
+    let liveSpot = liveChain?.spot;
+    if (!liveSpot && sym === 'NIFTY') {
+      const liveData = liveEngine.getLatestData();
+      if (liveData && liveData.spot) liveSpot = liveData.spot;
+    }
+    const spot = liveSpot || meta.spot;
     const atmRange = parseInt(range) || 4;
     const intervalMins = parseInt(interval) || 1;
 
@@ -290,8 +295,9 @@ router.get('/', async (req, res) => {
       success: true,
       expiry,
       mode: mode.toUpperCase(),
-      asOfDate: mode.toUpperCase() === 'HISTORICAL' ? `${date} (Historical EOD Retained)` : '30 Oct 2026 (Friday Closing Retained)',
+      asOfDate: mode.toUpperCase() === 'HISTORICAL' ? `${date} (Historical EOD Retained)` : `${new Date().toLocaleDateString('en-GB')} (Live Real-Time)`,
       ...result,
+      timeFormatted: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

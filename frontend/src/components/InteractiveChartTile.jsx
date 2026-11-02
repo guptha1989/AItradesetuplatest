@@ -1291,6 +1291,29 @@ export default function InteractiveChartTile({
           <span style={{ fontSize: '0.66rem', color: isRealTradeMode ? '#dc2626' : '#059669', fontWeight: 700 }}>
             {isRealTradeMode ? '🔴 REAL' : '📝 PAPER'}
           </span>
+
+          {/* Real-time Tick-by-tick Update Timestamp */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            background: isWhiteTheme ? '#f1f5f9' : 'rgba(255,255,255,0.08)',
+            border: isWhiteTheme ? '1px solid #cbd5e1' : '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '4px',
+            padding: '2px 7px',
+            fontSize: '0.68rem',
+            fontWeight: 600,
+            color: isWhiteTheme ? '#334155' : '#cbd5e1',
+          }}>
+            <span style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Updated: <strong style={{ color: isWhiteTheme ? '#0f172a' : '#f8fafc' }}>{lastWsTickTime || 'Live'}</strong> (Tick-by-tick)</span>
+          </div>
         </div>
 
         {/* ─── TOP-RIGHT QUANTITATIVE HUD INFO TABLE (EXACT IMAGE 1 MATCH) ─── */}

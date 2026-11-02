@@ -141,9 +141,28 @@ export default function TrendingOI() {
           <span style={{ background: isDark ? '#10b98120' : '#ecfdf5', color: '#059669', border: isDark ? '1px solid #10b98140' : '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
             🟢 LIVE UPDATING
           </span>
-          <span style={{ fontSize: '0.75rem', color: textMuted }}>
-            Friday 30 Oct 2026 Closing Base ({lastUpdated || 'Connecting...'})
-          </span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
+            border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #cbd5e1',
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '0.78rem',
+            color: textDark,
+            fontWeight: 600,
+          }}>
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              background: '#10b981',
+              boxShadow: '0 0 6px #10b981',
+            }} />
+            <span>Last Updated: <strong>{lastUpdated || 'Connecting...'}</strong></span>
+            <span style={{ fontSize: '0.7rem', color: textMuted }}>(10s auto-refresh)</span>
+          </div>
         </div>
 
         {/* View Switcher: Graph / Table */}

@@ -170,13 +170,17 @@ export default function Dashboard() {
   const [alertSearch, setAlertSearch] = useState('');
   const [alertPage, setAlertPage] = useState(1);
 
+  const [dashboardLastUpdated, setDashboardLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+
   useEffect(() => {
     fetchLiveData();
     fetchPolicyAlerts(6, 500);
     fetchSavedPolicies();
+    setDashboardLastUpdated(new Date().toLocaleTimeString('en-IN'));
     const interval = setInterval(() => {
       fetchLiveData();
       fetchPolicyAlerts(6, 500);
+      setDashboardLastUpdated(new Date().toLocaleTimeString('en-IN'));
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -280,6 +284,29 @@ export default function Dashboard() {
                 </span>
               )}
             </span>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+              borderRadius: '6px',
+              padding: '3px 10px',
+              fontSize: '0.74rem',
+              color: 'var(--color-text-primary)',
+              fontWeight: 600,
+            }}>
+              <span style={{
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: '#10b981',
+                boxShadow: '0 0 6px #10b981',
+              }} />
+              <span>Last Updated: <strong>{dashboardLastUpdated}</strong></span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>(10s auto-refresh)</span>
+            </div>
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

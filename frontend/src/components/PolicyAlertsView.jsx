@@ -40,13 +40,17 @@ export default function PolicyAlertsView() {
     }
   };
 
+  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+
   useEffect(() => {
     fetchPolicyAlerts();
     fetchSavedPolicies();
     markAlertsRead();
+    setLastUpdated(new Date().toLocaleTimeString('en-IN'));
     const interval = setInterval(() => {
       fetchPolicyAlerts();
       fetchSavedPolicies();
+      setLastUpdated(new Date().toLocaleTimeString('en-IN'));
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -339,6 +343,28 @@ export default function PolicyAlertsView() {
             <span style={{ fontSize: '0.75rem', background: isDark ? '#3b82f620' : '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '12px', fontWeight: 700 }}>
               LIVE STREAM
             </span>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9',
+              border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '3px 8px',
+              fontSize: '0.72rem',
+              color: textDark,
+              fontWeight: 600,
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#10b981',
+                boxShadow: '0 0 6px #10b981',
+              }} />
+              <span>Last Updated: <strong>{lastUpdated}</strong></span>
+              <span style={{ fontSize: '0.68rem', color: textMuted }}>(10s auto-refresh)</span>
+            </div>
           </h1>
           <p style={{ margin: '4px 0 0', color: textMuted, fontSize: '0.85rem' }}>
             Real-time multi-indicator alert policy triggers with points captured, success rate, and drawdown analytics.

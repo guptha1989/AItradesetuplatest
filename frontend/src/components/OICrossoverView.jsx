@@ -212,7 +212,8 @@ export default function OICrossoverView() {
               background: '#10b981',
               boxShadow: '0 0 8px #10b981',
             }} />
-            <span style={{ fontWeight: 600 }}>{lastUpdated || 'Connecting...'}</span>
+            <span>Last Updated: <strong style={{ color: textDark }}>{lastUpdated || 'Connecting...'}</strong></span>
+            <span style={{ fontSize: '0.72rem', color: textMuted }}>(10s auto-refresh)</span>
           </div>
 
           <button
