@@ -122,7 +122,7 @@ export default function InteractiveChartTile({
   const [hoverBar, setHoverBar] = useState(null);
 
   // Global Theme & Realtime Ticks from Store
-  const { theme, spot, lastTick, ticks } = useTradingStore();
+  const { theme, spot, lastTick, ticks, lastWsTickTime } = useTradingStore();
   const isWhiteTheme = theme === 'light';
 
   // Broker Candlestick Theme Selection
