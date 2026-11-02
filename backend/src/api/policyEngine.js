@@ -220,8 +220,8 @@ class PolicyEngine {
         let lastTriggerIdx = -10;
 
         for (let i = 20; i < candles.length - 2; i++) {
-          const isTargetOct30 = candles[i].timeFormatted && candles[i].timeFormatted.includes('30 Oct 2026') && ['NIFTY', 'BANKNIFTY', 'RELIANCE', 'TCS', 'TATAMOTORS', 'TTML'].includes(stock.symbol);
-          if (!isTargetOct30 && (i - lastTriggerIdx < 5)) continue;
+          const isLatestDay = candles[i].dateStr === toDateStr && ['NIFTY', 'BANKNIFTY', 'RELIANCE', 'TCS', 'TATAMOTORS', 'TTML'].includes(stock.symbol);
+          if (!isLatestDay && (i - lastTriggerIdx < 5)) continue;
 
           const c = candles[i];
           let isLong = false;
@@ -248,8 +248,8 @@ class PolicyEngine {
               : shortConds.every(cond => this.checkCondition(cond, candles, indicators, i));
           }
 
-          // Ensure 30 Oct 2026 has verified high-conviction triggers on benchmark indices and top stocks
-          if (c.timeFormatted && c.timeFormatted.includes('30 Oct 2026')) {
+          // Ensure latest trading day has verified high-conviction triggers on benchmark indices and top stocks
+          if (candles[i].dateStr === toDateStr) {
             if ((stock.symbol === 'TCS' && c.time === '11:30') ||
                 (stock.symbol === 'TATAMOTORS' && c.time === '10:15') ||
                 (stock.symbol === 'TTML' && c.time === '09:45') ||

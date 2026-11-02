@@ -4,6 +4,7 @@ const logger = require('../../utils/logger');
 const { wsServer } = require('../../websocket/wsServer');
 const { dhanWS } = require('./dhanWS');
 const { policyEngine } = require('../policyEngine');
+const { formatIstDateTime } = require('../../utils/dateHelper');
 
 class LiveEngine {
   constructor() {
@@ -70,11 +71,8 @@ class LiveEngine {
 
   _streamLiveTick() {
     try {
-      const now = new Date();
-      const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const istNow = new Date(utcMs + (330 * 60000));
-      const timeStr = istNow.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const timeSec = Math.floor(now.getTime() / 1000);
+      const timeStr = formatIstDateTime();
+      const timeSec = Math.floor(Date.now() / 1000);
 
       // Continuous realtime micro-fluctuations (±0.05 to ±0.25 pts) on NIFTY
       let currentSpot = this.latestData.spot || 23053.10;
@@ -141,7 +139,7 @@ class LiveEngine {
     const change = parseFloat((spot - prevClose).toFixed(2));
     const changePercent = parseFloat(((change / prevClose) * 100).toFixed(2));
     const atm = Math.round(spot / 50) * 50;
-    const updatedAt = new Date().toLocaleTimeString('en-IN');
+    const updatedAt = formatIstDateTime();
 
     this.latestData.spot = spot;
     this.latestData.prevClose = prevClose;
@@ -223,7 +221,7 @@ class LiveEngine {
       }
 
       const pcr = totalCE_OI > 0 ? parseFloat((totalPE_OI / totalCE_OI).toFixed(2)) : 1.25;
-      const updatedAt = new Date().toLocaleTimeString('en-IN');
+      const updatedAt = formatIstDateTime();
 
       this.latestData = {
         spot,

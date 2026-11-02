@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTradingStore } from '../store/tradingStore';
 import toast from 'react-hot-toast';
+import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
 
 export default function OICrossoverView() {
   const { wsConnected, theme } = useTradingStore();
@@ -18,7 +19,7 @@ export default function OICrossoverView() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(() => formatDateTime());
   
   // Filters
   const [crossoverFilter, setCrossoverFilter] = useState('ALL'); // 'ALL' | 'BULL' | 'BEAR'
@@ -60,7 +61,7 @@ export default function OICrossoverView() {
 
       if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
         setData(res.data);
-        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(ensureDateInTimestamp(res.dhanTime || res.timeFormatted));
         setError(null);
       }
     } catch (err) {
@@ -628,8 +629,8 @@ export default function OICrossoverView() {
                       </td>
 
                       {/* Crossover Time */}
-                      <td style={{ padding: '12px 16px', textAlign: 'center', color: textMuted, fontSize: '0.8rem' }}>
-                        ⏰ {row.crossoverTime}
+                      <td style={{ padding: '12px 16px', textAlign: 'center', color: textMuted, fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                        ⏰ {ensureDateInTimestamp(row.crossoverTime)}
                       </td>
 
                       {/* Cross Count */}

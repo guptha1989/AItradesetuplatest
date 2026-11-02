@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
 
 const getWSUrl = () => {
   if (typeof window === 'undefined') return 'ws://localhost:3001/ws';
@@ -186,7 +187,7 @@ export const useTradingStore = create((set, get) => ({
           optionChain: chainRes.chain,
           spot: chainRes.spot || get().spot,
           atm: chainRes.atm || get().atm,
-          lastChainUpdate: new Date().toLocaleTimeString('en-IN'),
+          lastChainUpdate: ensureDateInTimestamp(chainRes.dhanTime || chainRes.timeFormatted || formatDateTime()),
         });
       }
 
@@ -295,7 +296,7 @@ export const useTradingStore = create((set, get) => ({
         const sym = data.symbol || (data.securityId === '13' ? 'NIFTY' : null);
         const ltp = Number(data.ltp || data.spot || 0);
         const timestamp = data.timestamp || Math.floor(Date.now() / 1000);
-        const timeStr = data.time || new Date().toLocaleTimeString('en-IN');
+        const timeStr = ensureDateInTimestamp(data.time || formatDateTime());
 
         const tickObj = {
           symbol: sym,

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useTradingStore } from '../store/tradingStore';
 import toast from 'react-hot-toast';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
 
 // Friday 30 Oct 2026 Closing Instruments Master (Dhan API Verified)
 const ALL_INSTRUMENTS = [
@@ -66,7 +67,7 @@ export default function TrendingOI() {
   const currentAtm = Math.round(currentSpot / selectedInst.step) * selectedInst.step;
 
   const [data, setData] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState('');
+  const [lastUpdated, setLastUpdated] = useState(() => formatDateTime());
   const [contractExpiries, setContractExpiries] = useState(CONTRACT_EXPIRIES);
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export default function TrendingOI() {
       const res = await fetch(`/api/trending-oi/analysis?${params}`).then(r => r.json());
       if (res && res.success) {
         setData(res);
-        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(ensureDateInTimestamp(res.dhanTime || res.timeFormatted));
       }
     } catch (err) {
       console.error('Fetch Trending OI analysis failed:', err);
@@ -489,7 +490,7 @@ export default function TrendingOI() {
                 <CartesianGrid stroke="#33415530" strokeDasharray="3 3" />
                 <XAxis dataKey="time" tick={{ fill: '#64748b', fontSize: 11 }} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `${(v / 100000).toFixed(1)}L`} />
-                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} />
+                <Tooltip contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px' }} labelFormatter={(lbl) => ensureDateInTimestamp(lbl)} />
                 <Legend />
                 <Line type="monotone" dataKey="totalCeOI" name="Call OI" stroke="#10b981" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="totalPeOI" name="Put OI" stroke="#ef4444" strokeWidth={2} dot={false} />
@@ -518,7 +519,7 @@ export default function TrendingOI() {
               <tbody>
                 {rows.slice().reverse().map((r, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #33415530', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
-                    <td style={{ padding: '10px 16px', color: '#94a3b8' }}>{r.time}</td>
+                    <td style={{ padding: '10px 16px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{ensureDateInTimestamp(r.time)}</td>
                     <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace' }}>₹{r.spot}</td>
                     <td style={{ padding: '10px 16px', textAlign: 'right', fontFamily: 'monospace', color: '#10b981' }}>
                       {(r.totalCeOI / 100000).toFixed(2)} L

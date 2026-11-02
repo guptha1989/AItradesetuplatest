@@ -17,6 +17,7 @@ import SupportResistance from './components/SupportResistance';
 import TradeTerminalView from './components/TradeTerminalView';
 import RealtimeChartView from './components/RealtimeChartView';
 import AIChatModal from './components/AIChatModal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function App() {
   const { connectWS, activePage, theme } = useTradingStore();
@@ -59,7 +60,9 @@ function App() {
       <div className="app-content">
         <Sidebar onOpenAIChat={() => setIsAIChatOpen(true)} />
         <main className="main-panel">
-          {renderPage()}
+          <ErrorBoundary>
+            {renderPage()}
+          </ErrorBoundary>
         </main>
       </div>
       <AIChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />

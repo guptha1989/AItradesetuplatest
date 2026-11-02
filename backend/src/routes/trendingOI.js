@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
+const { formatIstDateTime, getTodayDateStr } = require('../utils/dateHelper');
 
 let oiAnalysisCache = { key: null, data: null, expiresAt: 0 };
 
@@ -98,7 +99,8 @@ router.get('/analysis', async (req, res) => {
       const mm = cur % 60;
       const ampm = hh >= 12 ? 'PM' : 'AM';
       const displayHour = hh > 12 ? hh - 12 : (hh === 0 ? 12 : hh);
-      const displayTime = `${displayHour}:${String(mm).padStart(2, '0')} ${ampm}`;
+      const todayFormatted = getTodayDateStr();
+      const displayTime = `${todayFormatted}, ${displayHour}:${String(mm).padStart(2, '0')} ${ampm}`;
 
       const progress = (cur - startMins) / (marketCloseMins - startMins);
       const wave = Math.sin(progress * Math.PI * 4) * 80000 * selectedStrikes.length;
@@ -138,9 +140,9 @@ router.get('/analysis', async (req, res) => {
       rangeStr: `${selectedStrikes[0]} - ${selectedStrikes[selectedStrikes.length - 1]}`,
       timeframe: tfMins,
       rows,
-      asOfDate: mode === 'live' ? `${istInfo.dateStr} (Live Real-Time)` : '30 Oct 2026 (Historical EOD)',
-      timeFormatted: liveEngine?.latestData?.updatedAt || istInfo.timeStr,
-      dhanTime: liveEngine?.latestData?.updatedAt || istInfo.timeStr,
+      asOfDate: mode === 'live' ? `${getTodayDateStr()} (Live Real-Time)` : '30 Oct 2026 (Historical EOD)',
+      timeFormatted: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
+      dhanTime: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

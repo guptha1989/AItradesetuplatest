@@ -133,19 +133,20 @@ function calculateInstrumentOICrossover(item, baseSpot = null, atmRange = 4) {
   const istDate = new Date(utcMs + (330 * 60000));
   const currentIstMins = istDate.getHours() * 60 + istDate.getMinutes();
   const marketOpenMins = 9 * 60 + 15; // 09:15 AM
+  const dateFormatted = istDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   
-  // Elapsed trading minutes today (e.g. from 09:15 AM up to current time)
-  const elapsedMins = Math.max(5, currentIstMins - marketOpenMins);
-  const cappedElapsed = Math.min(375, elapsedMins);
+  // Elapsed trading minutes today (e.g. from 09:15 AM up to current time, strictly capped to market hours)
+  // If tested around midday (12:16 PM), elapsed is ~180 mins.
+  const maxAllowedMins = currentIstMins >= (15 * 60 + 30) ? 375 : Math.max(5, Math.min(375, currentIstMins - marketOpenMins));
   
   // Crossover minute occurs between 5 minutes after open and current minute (never in future!)
-  const crossOffset = 5 + ((seedNum * 13) % Math.max(1, cappedElapsed - 5));
+  const crossOffset = 5 + ((seedNum * 13) % Math.max(1, maxAllowedMins - 5));
   const totalCrossMinutes = marketOpenMins + crossOffset;
   const hour = Math.floor(totalCrossMinutes / 60);
   const min = totalCrossMinutes % 60;
   const ampm = hour >= 12 ? 'PM' : 'AM';
   const displayHour = hour > 12 ? hour - 12 : (hour === 0 ? 12 : hour);
-  const crossoverTime = `${displayHour}:${String(min).padStart(2, '0')} ${ampm}`;
+  const crossoverTime = `${dateFormatted}, ${displayHour}:${String(min).padStart(2, '0')} ${ampm}`;
 
   return {
     symbol: item.symbol,
@@ -260,7 +261,11 @@ router.get('/', async (req, res) => {
       filtered = filtered.filter(i => i.symbol.toLowerCase().includes(q) || i.name.toLowerCase().includes(q));
     }
 
-    const dhanTime = liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const nowUtc = new Date();
+    const istFull = new Date(nowUtc.getTime() + (nowUtc.getTimezoneOffset() * 60000) + (330 * 60000));
+    const fullDateStr = istFull.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const rawTime = liveEngine?.latestData?.updatedAt || istFull.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dhanTime = rawTime.includes(fullDateStr) ? rawTime : `${fullDateStr}, ${rawTime}`;
 
     const payload = {
       success: true,

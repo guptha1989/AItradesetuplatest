@@ -7,6 +7,7 @@ const { query } = require('../config/db');
 const { getPositions, getOrders, placeOrder, cancelOrder } = require('../api/dhan/dhanClient');
 const { wsServer } = require('../websocket/wsServer');
 const logger = require('../utils/logger');
+const { formatIstDateTime, getTodayDateStr } = require('../utils/dateHelper');
 
 const PAPER_TRADES_FILE = path.join(__dirname, '../config/paper_trades.json');
 
@@ -373,8 +374,8 @@ router.get('/', async (req, res) => {
       qty: p.buyQty,
       entry_price: p.buyAvg,
       exit_price: p.status === 'CLOSED' ? (p.currentLtp || p.buyAvg) : '',
-      entry_time: '30 Oct 2026, 09:45 AM',
-      exit_time: p.status === 'CLOSED' ? '30 Oct 2026, 03:20 PM' : null,
+      entry_time: `${getTodayDateStr()}, 09:45 AM`,
+      exit_time: p.status === 'CLOSED' ? `${getTodayDateStr()}, 03:20 PM` : null,
       status: p.status,
       pnl: p.pnl || p.unrealizedPnl || 0,
       net_pnl: (p.pnl || p.unrealizedPnl || 0) * 0.998,

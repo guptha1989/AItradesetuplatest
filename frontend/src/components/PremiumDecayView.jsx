@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
 import { useTradingStore } from '../store/tradingStore';
 import toast from 'react-hot-toast';
+import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
 
 // Friday 30 Oct 2026 Closing Instruments Master (Dhan API Verified)
 const ALL_INSTRUMENTS = [
@@ -249,7 +250,7 @@ function CustomDecayTooltip({ active, payload, label }) {
       minWidth: '155px',
     }}>
       <div style={{ fontWeight: 700, marginBottom: '6px', color: '#1e293b', borderBottom: '1px solid #f1f5f9', paddingBottom: '3px' }}>
-        30 Oct, {d.displayTime || label}
+        {ensureDateInTimestamp(d.displayTime || label)}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -309,7 +310,7 @@ export default function PremiumDecayView() {
   // Initial client dataset for 0ms initial render
   const selectedInst = ALL_INSTRUMENTS.find(i => i.id === symbol) || ALL_INSTRUMENTS[0];
   const [decayData, setDecayData] = useState(() => buildClientDecaySeries('NIFTY', 23053.10, 4, '2026-10-30'));
-  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+  const [lastUpdated, setLastUpdated] = useState(() => formatDateTime());
 
   // Fetch / update live series every 2.5s
   const fetchDecayData = async () => {
@@ -326,14 +327,14 @@ export default function PremiumDecayView() {
 
       if (res && res.success && Array.isArray(res.series) && res.series.length > 0) {
         setDecayData(res);
-        setLastUpdated(res.dhanTime || res.timeFormatted || new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(ensureDateInTimestamp(res.dhanTime || res.timeFormatted));
       } else {
         setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate, mode));
-        setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+        setLastUpdated(formatDateTime());
       }
     } catch (err) {
       setDecayData(buildClientDecaySeries(symbol, selectedInst.spot, atmRange, historicalDate, mode));
-      setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+      setLastUpdated(formatDateTime());
     }
   };
 
@@ -887,13 +888,13 @@ export default function PremiumDecayView() {
                 <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}`} domain={['auto', 'auto']} />
                 <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={1.5} />
                 <Tooltip content={<CustomDecayTooltip />} />
-                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
-                <Line type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2.2} dot={false} isAnimationActive={false} />
-                <Area type="monotone" dataKey="ceChange" stroke="none" fill="url(#ceGradient)" isAnimationActive={false} />
-                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
-                <Line type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2.2} dot={false} isAnimationActive={false} />
-                <Area type="monotone" dataKey="peChange" stroke="none" fill="url(#peGradient)" isAnimationActive={false} />
-                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
+                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
+                <Line type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2.2} dot={false} isAnimationActive={false} connectNulls />
+                <Area type="monotone" dataKey="ceChange" stroke="none" fill="url(#ceGradient)" isAnimationActive={false} baseValue={0} connectNulls />
+                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
+                <Line type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2.2} dot={false} isAnimationActive={false} connectNulls />
+                <Area type="monotone" dataKey="peChange" stroke="none" fill="url(#peGradient)" isAnimationActive={false} baseValue={0} connectNulls />
+                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -924,9 +925,9 @@ export default function PremiumDecayView() {
                 <XAxis dataKey="displayTime" tick={{ fill: '#64748b', fontSize: 10 }} interval={Math.floor(series.length / 8) || 30} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
                 <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.8rem', color: '#0f172a' }} />
-                <Line type="monotone" dataKey="totalPremium" name="Total Straddle" stroke="#2563eb" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="cePremium" name="CE Premium" stroke="#16a34a" strokeWidth={1.5} dot={false} />
-                <Line type="monotone" dataKey="pePremium" name="PE Premium" stroke="#dc2626" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="totalPremium" name="Total Straddle" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
+                <Line type="monotone" dataKey="cePremium" name="CE Premium" stroke="#16a34a" strokeWidth={1.5} dot={false} connectNulls />
+                <Line type="monotone" dataKey="pePremium" name="PE Premium" stroke="#dc2626" strokeWidth={1.5} dot={false} connectNulls />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

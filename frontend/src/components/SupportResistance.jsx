@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTradingStore } from '../store/tradingStore';
+import { formatDateTime, ensureDateInTimestamp } from '../utils/dateHelper';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -51,7 +52,7 @@ export default function SupportResistance() {
       });
       const res = await fetch(`${API_BASE}/sr?${params}`).then(r => r.json());
       setData(res);
-      setSrLastUpdated(new Date().toLocaleTimeString('en-IN'));
+      setSrLastUpdated(ensureDateInTimestamp(res.dhanTime || res.timeFormatted || formatDateTime()));
     } catch (err) {
       console.error('Fetch S&R failed:', err);
     } finally {

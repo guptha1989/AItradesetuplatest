@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../utils/logger');
 const { liveEngine } = require('../api/dhan/liveEngine');
+const { formatIstDateTime } = require('../utils/dateHelper');
 
 // Master spot & volatility prices for Friday 30 Oct session across MCX, NSE, BSE
 const BASE_PRICES = {
@@ -232,8 +233,8 @@ router.get('/candles', (req, res) => {
       days: parseInt(days) || 15,
       total: candles.length,
       candles,
-      dhanTime: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
-      timeFormatted: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
+      dhanTime: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
+      timeFormatted: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

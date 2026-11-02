@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useTradingStore } from '../store/tradingStore';
+import { formatDateTime, ensureDateInTimestamp } from '../utils/dateHelper';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -102,7 +103,7 @@ export default function OptionChainView() {
         setChain(res.chain);
         setExpiry(res.expiry || '');
         if (res.spot) setSpotPrice(res.spot);
-        setLastUpdate(new Date().toLocaleTimeString('en-IN'));
+        setLastUpdate(ensureDateInTimestamp(res.dhanTime || res.timeFormatted || formatDateTime()));
       }
     } catch (err) {
       console.error('Chain fetch failed:', err);

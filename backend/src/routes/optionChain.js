@@ -6,6 +6,7 @@ const { calcGreeks, calcPCR, findATMStrike } = require('../utils/greeksCalc');
 const { tickBuffer } = require('../utils/tickBuffer');
 const { query } = require('../config/db');
 const logger = require('../utils/logger');
+const { formatIstDateTime } = require('../utils/dateHelper');
 
 const { replayEngine } = require('../utils/replayEngine');
 const { liveEngine } = require('../api/dhan/liveEngine');
@@ -31,7 +32,7 @@ router.get('/expiries', async (req, res) => {
       currentMonth: standardExpiries[2],
       nextMonth: standardExpiries[3],
       dhanExpiry,
-      dhanTime: liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN'),
+      dhanTime: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -49,7 +50,7 @@ router.get('/', async (req, res) => {
     // Prefer liveEngine if live & updated for NIFTY
     const liveData = liveEngine.getLatestData();
     if (symbol.toUpperCase() === 'NIFTY' && liveEngine.isLive && liveData.chain && liveData.chain.length > 0) {
-      return res.json(liveData);
+      return res.json({ ...liveData, dhanTime: liveData.updatedAt || formatIstDateTime() });
     }
     const cacheKey = `${symbol}_${expiry}`;
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useTradingStore } from '../store/tradingStore';
+import { formatDateTime } from '../utils/dateHelper';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -24,7 +25,7 @@ export default function AllContractsView() {
 
   // Default sorting state: Strike price ascending
   const [sortConfig, setSortConfig] = useState({ field: 'strike', dir: 'asc' });
-  const [contractsLastUpdated, setContractsLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+  const [contractsLastUpdated, setContractsLastUpdated] = useState(() => formatDateTime());
 
   const fetchContracts = async () => {
     setLoading(true);
@@ -40,7 +41,7 @@ export default function AllContractsView() {
       if (res.contracts) {
         setContracts(res.contracts);
         setParameters(res.parameters || {});
-        setContractsLastUpdated(new Date().toLocaleTimeString('en-IN'));
+        setContractsLastUpdated(formatDateTime());
         if (res.expiries && res.expiries.length > 0) {
           setExpiries(res.expiries);
           if (!selectedExpiry) setSelectedExpiry(res.expiries[0]);

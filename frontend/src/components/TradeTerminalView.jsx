@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useTradingStore } from '../store/tradingStore';
+import { formatDateTime } from '../utils/dateHelper';
 
 export default function TradeTerminalView({ initialTab = 'ORDERS' }) {
   const { theme } = useTradingStore();
@@ -64,14 +65,14 @@ export default function TradeTerminalView({ initialTab = 'ORDERS' }) {
     }
   };
 
-  const [terminalLastUpdated, setTerminalLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+  const [terminalLastUpdated, setTerminalLastUpdated] = useState(() => formatDateTime());
 
   useEffect(() => {
     fetchTerminalData();
-    setTerminalLastUpdated(new Date().toLocaleTimeString('en-IN'));
+    setTerminalLastUpdated(formatDateTime());
     const interval = setInterval(() => {
       fetchTerminalData();
-      setTerminalLastUpdated(new Date().toLocaleTimeString('en-IN'));
+      setTerminalLastUpdated(formatDateTime());
     }, 10000);
     return () => clearInterval(interval);
   }, [tradingMode]);

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTradingStore } from '../store/tradingStore';
 import toast from 'react-hot-toast';
 import { STOCK_UNIVERSES } from '../utils/instruments';
+import { ensureDateInTimestamp, formatDateTime } from '../utils/dateHelper';
 
 export default function PolicyAlertsView() {
   const { policyAlerts, fetchPolicyAlerts, savedPolicies, fetchSavedPolicies, clearPolicyAlerts, markAlertsRead, spot, theme } = useTradingStore();
@@ -40,17 +41,17 @@ export default function PolicyAlertsView() {
     }
   };
 
-  const [lastUpdated, setLastUpdated] = useState(() => new Date().toLocaleTimeString('en-IN'));
+  const [lastUpdated, setLastUpdated] = useState(() => formatDateTime());
 
   useEffect(() => {
     fetchPolicyAlerts();
     fetchSavedPolicies();
     markAlertsRead();
-    setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+    setLastUpdated(formatDateTime());
     const interval = setInterval(() => {
       fetchPolicyAlerts();
       fetchSavedPolicies();
-      setLastUpdated(new Date().toLocaleTimeString('en-IN'));
+      setLastUpdated(formatDateTime());
     }, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -968,10 +969,10 @@ export default function PolicyAlertsView() {
                   const badgeColor = isLong ? (isDark ? '#34d399' : '#059669') : isShort ? (isDark ? '#f87171' : '#dc2626') : isExit ? '#d97706' : '#7c3aed';
                   const badgeBg = isLong ? (isDark ? '#10b98120' : '#ecfdf5') : isShort ? (isDark ? '#ef444420' : '#fef2f2') : isExit ? (isDark ? '#f59e0b20' : '#fffbeb') : (isDark ? '#8b5cf620' : '#f5f3ff');
                   const pts = alert.pointsCaptured !== undefined && alert.pointsCaptured !== null ? Number(alert.pointsCaptured) : null;
-                  const exactTime = alert.exactTriggerTime || alert.timeFormatted || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('en-IN') : '--');
+                  const exactTime = ensureDateInTimestamp(alert.exactTriggerTime || alert.timeFormatted || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('en-IN') : '--'));
 
                   return (
-                    <tr key={alert.id || idx} style={{ borderBottom: isDark ? '1px solid #243044' : '1px solid #f1f5f9', background: idx % 2 === 0 ? 'transparent' : (isDark ? 'rgba(255,255,255,0.015)' : '#f8fafc') }}>
+                    <tr key={`${alert.id || 'alert'}_${idx}`} style={{ borderBottom: isDark ? '1px solid #243044' : '1px solid #f1f5f9', background: idx % 2 === 0 ? 'transparent' : (isDark ? 'rgba(255,255,255,0.015)' : '#f8fafc') }}>
                       <td style={{ padding: '8px', color: textMuted }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 700, color: textDark }}>
                         {alert.policyName}
@@ -1131,7 +1132,7 @@ export default function PolicyAlertsView() {
 
             const pts = alert.pointsCaptured !== undefined && alert.pointsCaptured !== null ? Number(alert.pointsCaptured) : null;
             const dd = alert.maxDrawdown !== undefined && alert.maxDrawdown !== null ? Number(alert.maxDrawdown) : null;
-            const exactTime = alert.exactTriggerTime || alert.timeFormatted || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('en-IN') : '--');
+            const exactTime = ensureDateInTimestamp(alert.exactTriggerTime || alert.timeFormatted || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('en-IN') : '--'));
 
             return (
               <div

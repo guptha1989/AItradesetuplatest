@@ -4,6 +4,7 @@ const { liveEngine } = require('../api/dhan/liveEngine');
 const { getOptionChain, getRealDhanExpiry, SCRIP_MAP } = require('../api/dhan/dhanClient');
 const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const logger = require('../utils/logger');
+const { formatIstDateTime } = require('../utils/dateHelper');
 
 // Friday 30 Oct 2026 Verified Dhan API Closing Prices Master
 const INSTRUMENT_MASTER = {
@@ -312,7 +313,7 @@ router.get('/', async (req, res) => {
 
     const result = generatePremiumDecaySeries(sym, spot, atmRange, intervalMins, date, liveChain, mode);
 
-    const dhanTime = liveEngine?.latestData?.updatedAt || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dhanTime = liveEngine?.latestData?.updatedAt || formatIstDateTime();
 
     res.json({
       success: true,

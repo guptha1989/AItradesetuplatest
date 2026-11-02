@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
+import { formatDateTime, ensureDateInTimestamp } from '../utils/dateHelper';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -20,8 +21,8 @@ function exportToExcel(trades, pnlSummary, viewMode, selectedDate) {
       t.qty || '',
       t.entry_price ? parseFloat(t.entry_price) : '',
       t.exit_price ? parseFloat(t.exit_price) : '',
-      t.entry_time ? new Date(t.entry_time).toLocaleString('en-IN') : '',
-      t.exit_time ? new Date(t.exit_time).toLocaleString('en-IN') : '',
+      t.entry_time ? ensureDateInTimestamp(t.entry_time) : '',
+      t.exit_time ? ensureDateInTimestamp(t.exit_time) : '',
       t.status || '',
       t.pnl ? parseFloat(t.pnl) : '',
       t.net_pnl ? parseFloat(t.net_pnl) : '',
@@ -113,10 +114,18 @@ export default function TradeJournal() {
   const [selectedDayDetail, setSelectedDayDetail] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [journalLastUpdated, setJournalLastUpdated] = useState(() => formatDateTime());
 
   useEffect(() => {
     if (viewMode === 'daily') fetchDailyData(selectedDate);
     else fetchMonthlyData(selectedMonth);
+
+    const interval = setInterval(() => {
+      if (viewMode === 'daily') fetchDailyData(selectedDate);
+      else fetchMonthlyData(selectedMonth);
+      setJournalLastUpdated(formatDateTime());
+    }, 10000);
+    return () => clearInterval(interval);
   }, [viewMode, selectedDate, selectedMonth]);
 
   const fetchDailyData = async (date) => {
@@ -128,6 +137,7 @@ export default function TradeJournal() {
       ]);
       setTrades(tradesRes.trades || []);
       setPnlSummary(pnlRes.summary);
+      setJournalLastUpdated(formatDateTime());
     } catch (err) {
       console.error('Failed to fetch daily data:', err);
     } finally {
@@ -142,6 +152,7 @@ export default function TradeJournal() {
       setMonthlyHistory(res.dailyHistory || []);
       setPnlSummary(res.summary);
       setTrades(res.trades || []);
+      setJournalLastUpdated(formatDateTime());
     } catch (err) {
       console.error('Failed to fetch monthly data:', err);
       setMonthlyHistory([]);
@@ -216,6 +227,23 @@ export default function TradeJournal() {
           <button className="btn btn-success btn-sm" onClick={handleExport} disabled={exporting}>
             {exporting ? '⏳' : '📥'} Export Excel
           </button>
+
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'var(--color-bg-card, #ffffff)',
+            border: '1px solid var(--color-border, #cbd5e1)',
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '0.73rem',
+            color: 'var(--color-text-secondary, #475569)',
+            fontWeight: 600,
+          }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+            <span>Last Updated: <strong style={{ color: 'var(--color-text-primary, #0f172a)' }}>{journalLastUpdated}</strong></span>
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-text-muted, #64748b)' }}>(10s auto-refresh)</span>
+          </div>
         </div>
       </div>
 
@@ -339,11 +367,11 @@ export default function TradeJournal() {
                       <td className="font-mono">{t.lots || '—'}</td>
                       <td className="font-mono">{t.entry_price ? parseFloat(t.entry_price).toFixed(2) : '—'}</td>
                       <td className="font-mono">{t.exit_price ? parseFloat(t.exit_price).toFixed(2) : '—'}</td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                        {t.entry_time ? new Date(t.entry_time).toLocaleTimeString('en-IN') : '—'}
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                        {t.entry_time ? ensureDateInTimestamp(t.entry_time) : '—'}
                       </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
-                        {t.exit_time ? new Date(t.exit_time).toLocaleTimeString('en-IN') : '—'}
+                      <td style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                        {t.exit_time ? ensureDateInTimestamp(t.exit_time) : '—'}
                       </td>
                       <td>
                         <span className={`badge ${t.status === 'OPEN' ? 'badge-bullish' : t.status === 'CLOSED' ? 'badge-neutral' : 'badge-bearish'}`} style={{ fontSize: '0.65rem' }}>
