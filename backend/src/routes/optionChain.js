@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { getOptionChain, getLTP, getNextWeeklyExpiry, tradingDaysToExpiry, getRealDhanExpiry } = require('../api/dhan/dhanClient');
-const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
+const { getOptionChain, getLTP, getNextWeeklyExpiry, tradingDaysToExpiry, getRealDhanExpiry, getRealDhanExpiryList } = require('../api/dhan/dhanClient');
+const { getContractExpiries, getDefaultExpiry, getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const { calcGreeks, calcPCR, findATMStrike } = require('../utils/greeksCalc');
 const { tickBuffer } = require('../utils/tickBuffer');
 const { query } = require('../config/db');
@@ -13,24 +13,27 @@ const { liveEngine } = require('../api/dhan/liveEngine');
 
 let chainCache = { key: null, data: null, expiresAt: 0 };
 
-// GET /api/chain/expiries — dynamic weekly & monthly Thursday expiries with Dhan API sync
+// GET /api/chain/expiries — dynamic weekly & monthly expiries synced with Dhan API & SEBI schedule
 router.get('/expiries', async (req, res) => {
   try {
-    const symbol = req.query.symbol || 'NIFTY';
-    const standardExpiries = getThursdayExpiries();
-    let dhanExpiry = null;
+    const symbol = (req.query.symbol || 'NIFTY').toUpperCase();
+    let expiries = [];
     try {
-      dhanExpiry = await getRealDhanExpiry(symbol);
-    } catch (_) {}
+      expiries = await getRealDhanExpiryList(symbol);
+    } catch (_) {
+      expiries = getContractExpiries(symbol);
+    }
+
+    const dhanExpiry = expiries[0]?.date || '2026-11-03';
 
     res.json({
       success: true,
       symbol,
-      expiries: standardExpiries,
-      currentWeek: standardExpiries[0],
-      nextWeek: standardExpiries[1],
-      currentMonth: standardExpiries[2],
-      nextMonth: standardExpiries[3],
+      expiries,
+      currentWeek: expiries[0] || null,
+      nextWeek: expiries[1] || expiries[0] || null,
+      currentMonth: expiries[2] || expiries[1] || expiries[0] || null,
+      nextMonth: expiries[3] || expiries[2] || expiries[0] || null,
       dhanExpiry,
       dhanTime: liveEngine?.latestData?.updatedAt || formatIstDateTime(),
       timestamp: new Date().toISOString(),

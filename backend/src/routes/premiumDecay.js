@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { liveEngine } = require('../api/dhan/liveEngine');
-const { getOptionChain, getRealDhanExpiry, SCRIP_MAP } = require('../api/dhan/dhanClient');
-const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
+const { getOptionChain, getRealDhanExpiry, getRealDhanExpiryList, SCRIP_MAP } = require('../api/dhan/dhanClient');
+const { getContractExpiries, getDefaultExpiry, getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
 const logger = require('../utils/logger');
 const { formatIstDateTime } = require('../utils/dateHelper');
 const { getMarketHours } = require('../utils/marketHours');
@@ -284,16 +284,19 @@ function generatePremiumDecaySeries(symbol = 'NIFTY', spotPrice = null, atmRange
 // GET /api/premium-decay
 router.get('/', async (req, res) => {
   try {
+    const sym = (req.query.symbol || 'NIFTY').toUpperCase();
+    let expiry = req.query.expiry;
+    if (!expiry) {
+      expiry = await getRealDhanExpiry(sym);
+    }
+
     const {
-      symbol = 'NIFTY',
-      expiry = getNextThursdayExpiry(),
       interval = '1m',
       range = '4', // 2, 3, 4, 5
       mode = 'live',
       date = '2026-10-30',
     } = req.query;
 
-    const sym = (symbol || 'NIFTY').toUpperCase();
     const meta = INSTRUMENT_MASTER[sym] || { spot: 23053.10, step: 50, exchange: 'NSE' };
     
     // Pull real strike & spot details for this exact symbol from Dhan API
@@ -315,11 +318,19 @@ router.get('/', async (req, res) => {
 
     const result = generatePremiumDecaySeries(sym, spot, atmRange, intervalMins, date, liveChain, mode);
 
+    let activeExpiries = [];
+    try {
+      activeExpiries = await getRealDhanExpiryList(sym);
+    } catch (_) {
+      activeExpiries = getContractExpiries(sym);
+    }
+
     const dhanTime = liveEngine?.latestData?.updatedAt || formatIstDateTime();
 
     res.json({
       success: true,
       expiry,
+      expiries: activeExpiries,
       mode: mode.toUpperCase(),
       asOfDate: mode.toUpperCase() === 'HISTORICAL' ? `${date} (Historical EOD Retained)` : `${new Date().toLocaleDateString('en-GB')} (Live Real-Time)`,
       ...result,

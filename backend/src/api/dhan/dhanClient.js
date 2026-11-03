@@ -1,7 +1,7 @@
 const axios = require('axios');
 const config = require('../../config/env');
 const logger = require('../../utils/logger');
-const { getThursdayExpiries, getNextThursdayExpiry } = require('../../utils/expiryHelper');
+const { getContractExpiries, getDefaultExpiry, getThursdayExpiries, getNextThursdayExpiry, fmt } = require('../../utils/expiryHelper');
 
 const BASE_URL = config.dhan.baseUrl;
 
@@ -62,21 +62,24 @@ const SCRIP_MAP = {
 
 // Multi-symbol option chain and expiry caches
 const optionChainCache = new Map(); // Key: `${symbol}_${expiry}` -> { data, expiresAt }
-const cachedExpiries = new Map();   // Key: symbol -> { date, expiresAt }
+const cachedExpiries = new Map();   // Key: symbol -> { list, date, expiresAt }
 
-async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
+/**
+ * Fetches dynamic, real-time Dhan contract expiries for any symbol.
+ * Automatically aligns with SEBI schedule and exchange holiday shifts.
+ */
+async function getRealDhanExpiryList(underlyingSymbol = 'NIFTY') {
   const sym = (underlyingSymbol || 'NIFTY').toUpperCase();
   const cached = cachedExpiries.get(sym);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.date;
+  if (cached && Date.now() < cached.expiresAt && Array.isArray(cached.list) && cached.list.length > 0) {
+    return cached.list;
   }
 
-  const defaultThursday = getNextThursdayExpiry();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const fallbackList = getContractExpiries(sym);
   const scripMeta = SCRIP_MAP[sym];
 
   if (!scripMeta || !scripMeta.scrip) {
-    return defaultThursday;
+    return fallbackList;
   }
 
   try {
@@ -86,15 +89,62 @@ async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
     });
     const list = expRes.data?.data || expRes.data || expRes;
     if (Array.isArray(list) && list.length > 0) {
-      const activeList = list.filter(exp => exp >= todayStr);
-      const chosen = activeList.length > 0 ? activeList[0] : list[0];
-      cachedExpiries.set(sym, { date: chosen, expiresAt: Date.now() + 600000 });
-      return chosen;
+      // Calculate IST today date
+      const now = new Date();
+      const utcMs = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const istDate = new Date(utcMs + (330 * 60000));
+      const todayStr = `${istDate.getFullYear()}-${String(istDate.getMonth() + 1).padStart(2, '0')}-${String(istDate.getDate()).padStart(2, '0')}`;
+
+      const activeDates = list.filter(exp => exp >= todayStr);
+      const datesToFormat = activeDates.length > 0 ? activeDates : list;
+
+      const isWeekly = ['NIFTY', 'SENSEX'].includes(sym);
+      const formattedList = datesToFormat.slice(0, 6).map((isoStr, idx) => {
+        const [y, m, d] = isoStr.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        const formattedMeta = fmt(dt);
+        let type = 'EXPIRY';
+        let labelSuffix = '';
+        if (isWeekly) {
+          if (idx === 0) { type = 'CURRENT_WEEK'; labelSuffix = ' (Current Week)'; }
+          else if (idx === 1) { type = 'NEXT_WEEK'; labelSuffix = ' (Next Week)'; }
+          else if (idx === 2) { type = 'CURRENT_MONTH'; labelSuffix = ' (Current Month)'; }
+          else if (idx === 3) { type = 'NEXT_MONTH'; labelSuffix = ' (Next Month)'; }
+          else { type = 'FAR_MONTH'; labelSuffix = ` (Contract ${idx + 1})`; }
+        } else {
+          if (idx === 0) { type = 'CURRENT_MONTH'; labelSuffix = ' (Current Month)'; }
+          else if (idx === 1) { type = 'NEXT_MONTH'; labelSuffix = ' (Next Month)'; }
+          else if (idx === 2) { type = 'FAR_MONTH'; labelSuffix = ' (Far Month)'; }
+          else { type = 'FAR_MONTH'; labelSuffix = ` (Contract ${idx + 1})`; }
+        }
+
+        return {
+          id: isoStr,
+          date: isoStr,
+          formatted: formattedMeta.formatted,
+          label: `${formattedMeta.labelDate}${labelSuffix}`,
+          type,
+        };
+      });
+
+      cachedExpiries.set(sym, {
+        list: formattedList,
+        date: formattedList[0].date,
+        expiresAt: Date.now() + 600000,
+      });
+      return formattedList;
     }
   } catch (e) {
-    logger.warn(`Failed to fetch Dhan expiry list for ${sym}, fallback ${defaultThursday}: ${e.message}`);
+    logger.warn(`Failed to fetch Dhan expiry list for ${sym}, fallback to SEBI rules: ${e.message}`);
   }
-  return defaultThursday;
+
+  return fallbackList;
+}
+
+async function getRealDhanExpiry(underlyingSymbol = 'NIFTY') {
+  const sym = (underlyingSymbol || 'NIFTY').toUpperCase();
+  const list = await getRealDhanExpiryList(sym);
+  return list[0]?.date || getDefaultExpiry(sym);
 }
 
 /**
@@ -414,6 +464,7 @@ module.exports = {
   getNextThursdayExpiry,
   getThursdayExpiries,
   getRealDhanExpiry,
+  getRealDhanExpiryList,
   refreshContractDataForRequiredInstruments,
   tradingDaysToExpiry,
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTradingStore } from '../store/tradingStore';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { STOCK_UNIVERSES, INSTRUMENT_CATEGORIES, filterUniverses } from '../utils/instruments';
-import { formatDateTime, ensureDateInTimestamp, getTodayDateStr } from '../utils/dateHelper';
+import { formatDateTime, ensureDateInTimestamp } from '../utils/dateHelper';
 
 function MetricTile({ label, value, subValue, accentColor, prefix = '', suffix = '' }) {
   const [flash, setFlash] = React.useState(null);
@@ -465,7 +465,7 @@ export default function Dashboard() {
           </div>
 
           <div style={{ background: subCardBg, padding: '12px 16px', borderRadius: '8px', border: `1px solid ${isDark ? '#38bdf840' : '#93c5fd'}` }}>
-            <div style={{ fontSize: '0.7rem', color: textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Best Trade of the Day ({getTodayDateStr()})</div>
+            <div style={{ fontSize: '0.7rem', color: textMuted, textTransform: 'uppercase', fontWeight: 600 }}>Best Trade of the Day (30 Oct 2026)</div>
             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '2px' }}>NIFTY 23050 CE</div>
             <div style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>+43.85 pts (+₹4,385 / lot)</div>
           </div>
@@ -816,7 +816,7 @@ export default function Dashboard() {
                 💡 <strong>Trigger:</strong> PE OI crossed CE OI by 2.8L in ATM ± 4 strikes; high delivery accumulation at 20 EMA.
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ {getTodayDateStr()}, 10:45 AM</span>
+                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ 30 Oct 2026, 10:45 AM</span>
                 <button
                   onClick={() => toast.success('Executed Paper Trade for RELIANCE @ ₹2,980.00')}
                   style={{ background: '#059669', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
@@ -864,7 +864,7 @@ export default function Dashboard() {
                 💡 <strong>Trigger:</strong> Extreme oversold lower Bollinger breakout reversal (%B &lt; 0 bounce condition verified in 2021-2022 dataset).
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ {getTodayDateStr()}, 09:45 AM</span>
+                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ 30 Oct 2026, 09:45 AM</span>
                 <button
                   onClick={() => toast.success('Executed Paper Trade for TTML @ ₹75.20')}
                   style={{ background: '#7c3aed', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
@@ -912,7 +912,7 @@ export default function Dashboard() {
                 💡 <strong>Trigger:</strong> Volume breakout crosses 2.5x 20-day moving average volume; Bollinger band lower cross reversal.
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ {getTodayDateStr()}, 10:10 AM</span>
+                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ 30 Oct 2026, 10:10 AM</span>
                 <button
                   onClick={() => toast.success('Executed Paper Trade for BCG @ ₹12.40')}
                   style={{ background: '#d97706', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}
@@ -960,7 +960,7 @@ export default function Dashboard() {
                 💡 <strong>Trigger:</strong> Donchian channel upper breakout with IT sector relative strength outperformance.
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ {getTodayDateStr()}, 11:15 AM</span>
+                <span style={{ fontSize: '0.72rem', color: textMuted }}>⏰ 30 Oct 2026, 11:15 AM</span>
                 <button
                   onClick={() => toast.success('Executed Paper Trade for TCS @ ₹4,120.00')}
                   style={{ background: '#059669', color: 'white', border: 'none', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}

@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { getLTP, getPositions, getFundLimits, refreshContractDataForRequiredInstruments } = require('../api/dhan/dhanClient');
-const { getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
+const { getLTP, getPositions, getFundLimits, refreshContractDataForRequiredInstruments, getRealDhanExpiryList } = require('../api/dhan/dhanClient');
+const { getContractExpiries, getDefaultExpiry, getThursdayExpiries, getNextThursdayExpiry } = require('../utils/expiryHelper');
+const { getHolidayList } = require('../config/tradingHolidays');
 const logger = require('../utils/logger');
 
 // GET /api/market/ltp
@@ -362,14 +363,50 @@ router.get('/dhan-chain-dashboard', async (req, res) => {
   }
 });
 
-// GET /api/market/expiries — Returns the 4 standard Thursday expiries (Current Week, Next Week, Current Month, Next Month)
-router.get('/expiries', (req, res) => {
+// GET /api/market/holidays — Official NSE/BSE & MCX Trading Holidays with SEBI Expiry Shifting Rules
+router.get('/holidays', (req, res) => {
   try {
-    const list = getThursdayExpiries();
+    const holidays = getHolidayList();
     res.json({
       success: true,
-      expiries: list,
-      currentWeek: list[0]?.id,
+      count: holidays.length,
+      holidays,
+      rules: {
+        weeklySchedule: {
+          nifty: 'Every Tuesday of the week (NSE)',
+          sensex: 'Every Thursday of the week (BSE)',
+        },
+        monthlySchedule: {
+          banknifty: 'Last Tuesday of the month (NSE - Monthly contracts only)',
+          finnifty: 'Last Tuesday of the month (NSE - Monthly contracts only)',
+          midcapnifty: 'Last Tuesday of the month (NSE - Monthly contracts only)',
+          bankex: 'Last Thursday of the month (BSE - Monthly contracts only)',
+        },
+        holidayRule: 'If an expiry day falls on a market or trading holiday, the expiry shifts to the previous valid trading day.',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/market/expiries — Returns dynamic contract expiries synced with Dhan API & SEBI rules
+router.get('/expiries', async (req, res) => {
+  try {
+    const symbol = (req.query.symbol || 'NIFTY').toUpperCase();
+    let expiries = [];
+    try {
+      expiries = await getRealDhanExpiryList(symbol);
+    } catch (_) {
+      expiries = getContractExpiries(symbol);
+    }
+
+    res.json({
+      success: true,
+      symbol,
+      expiries,
+      currentWeek: expiries[0]?.id || null,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

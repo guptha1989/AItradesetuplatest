@@ -54,3 +54,4 @@ export const CHART_INSTRUMENTS = [
   { id: 'GOLD', name: 'GOLD', exchange: 'MCX', spot: 78450.00, step: 100, lotSize: 10 },
   { id: 'SILVER', name: 'SILVER', exchange: 'MCX', spot: 95200.00, step: 500, lotSize: 30 },
 ];
+

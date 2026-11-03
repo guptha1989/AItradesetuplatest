@@ -91,3 +91,4 @@ export function getElapsedMinsToday(symbolOrExchange = 'NSE', d = new Date(), st
   }
   return Math.min(hours.totalTradingMins, Math.max(stepMins, currentMins - hours.openMins));
 }
+

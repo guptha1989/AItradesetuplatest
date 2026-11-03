@@ -1,72 +1,122 @@
 /**
  * Expiry Helper for Indian Financial Markets (NSE, BSE, MCX)
- * Manages Thursday Weekly Expiries and Monthly Expiries:
- * - Current Week: Upcoming Thursday (e.g. 05 Nov 2026)
- * - Next Week: Following Thursday (e.g. 12 Nov 2026)
- * - Current Month: Last Thursday of Current Month (e.g. 26 Nov 2026)
- * - Next Month: Last Thursday of Next Month (e.g. 31 Dec 2026)
- * 
- * Auto-rollover occurs every Thursday at 15:40 IST (market close).
+ * Incorporates SEBI Revised Index Expiry Schedule:
+ * - Nifty 50 (NSE): Expires every Tuesday of the week.
+ * - Sensex (BSE): Expires every Thursday of the week.
+ * - Bank Nifty, FinNifty, Midcap Nifty, Nifty Next 50 (NSE): Monthly contracts only (last Tuesday of the month).
+ * - Bankex, Sensex 50 (BSE): Monthly contracts only (last Thursday of the month).
+ * - NSE / BSE Equities: Monthly contracts only (last Thursday of the month).
+ * - Holiday Rule: If an expiry day falls on a market or trading holiday,
+ *   the expiry shifts to the previous valid trading day.
+ * - Auto-rollover occurs on expiry day at 15:40 IST (after market close).
  */
 
-function getThursdayExpiries(refDate = new Date()) {
+const { shiftToPreviousTradingDay, isTradingHoliday } = require('../config/tradingHolidays');
+
+function toDateString(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function fmt(dt) {
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const labelDate = `${dd} ${months[dt.getMonth()]} ${yyyy}`;
+  const formatted = `${dd}-${months[dt.getMonth()]}-${yyyy}`;
+  return {
+    iso: `${yyyy}-${mm}-${dd}`,
+    formatted,
+    labelDate,
+  };
+}
+
+function getLastDayOfWeekInMonth(year, monthIndex, targetDow) {
+  // Start from last day of month at midday to avoid DST/tz issues
+  const lastDay = new Date(year, monthIndex + 1, 0, 12, 0, 0);
+  const diff = (lastDay.getDay() - targetDow + 7) % 7;
+  lastDay.setDate(lastDay.getDate() - diff);
+  return shiftToPreviousTradingDay(lastDay);
+}
+
+/**
+ * Returns dynamic contract expiries for any instrument according to SEBI regulations & holidays.
+ * @param {string} symbol - e.g. 'NIFTY', 'BANKNIFTY', 'SENSEX', 'FINNIFTY', 'RELIANCE'
+ * @param {Date|string} refDate - Reference date (defaults to current time)
+ * @returns {Array<{id: string, date: string, formatted: string, label: string, type: string}>}
+ */
+function getContractExpiries(symbol = 'NIFTY', refDate = new Date()) {
+  const sym = (symbol || 'NIFTY').toUpperCase();
   const d = new Date(refDate);
   const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
   const ist = new Date(utcMs + (330 * 60000));
   
-  const day = ist.getDay(); // 0: Sun, 1: Mon, ..., 4: Thu, 5: Fri, 6: Sat
+  const day = ist.getDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
   const hh = ist.getHours();
   const mm = ist.getMinutes();
-  
-  // Days to upcoming Thursday (day 4)
-  let daysToThu = (4 - day + 7) % 7;
-  // If today is Thursday after 15:40 IST market close, advance to next week
-  if (daysToThu === 0 && (hh > 15 || (hh === 15 && mm >= 40))) {
-    daysToThu = 7;
+
+  const isNifty = sym === 'NIFTY';
+  const isSensex = sym === 'SENSEX';
+  const isMonthlyTuesday = ['BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'NIFTYNXT50'].includes(sym);
+  const isMonthlyThursday = ['BANKEX', 'SENSEX50'].includes(sym) || (!isNifty && !isSensex && !isMonthlyTuesday);
+
+  // 1. Monthly Contracts Only (Bank Nifty, FinNifty, Midcap Nifty, Bankex, Equities)
+  if (isMonthlyTuesday || isMonthlyThursday) {
+    const targetDow = isMonthlyTuesday ? 2 : 4; // 2 = Tuesday, 4 = Thursday
+    let m0 = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth(), targetDow);
+    const todayStr = toDateString(ist);
+    const m0Str = toDateString(m0);
+    
+    // If current month's expiry date has passed (or is today after 15:40 market close)
+    let startMonthOffset = 0;
+    if (m0Str < todayStr || (m0Str === todayStr && (hh > 15 || (hh === 15 && mm >= 40)))) {
+      startMonthOffset = 1;
+    }
+
+    const cM = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth() + startMonthOffset, targetDow);
+    const nM = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth() + startMonthOffset + 1, targetDow);
+    const fM = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth() + startMonthOffset + 2, targetDow);
+
+    const fCM = fmt(cM);
+    const fNM = fmt(nM);
+    const fFM = fmt(fM);
+
+    return [
+      { id: fCM.iso, date: fCM.iso, formatted: fCM.formatted, label: `${fCM.labelDate} (Current Month)`, type: 'CURRENT_MONTH' },
+      { id: fNM.iso, date: fNM.iso, formatted: fNM.formatted, label: `${fNM.labelDate} (Next Month)`, type: 'NEXT_MONTH' },
+      { id: fFM.iso, date: fFM.iso, formatted: fFM.formatted, label: `${fFM.labelDate} (Far Month)`, type: 'FAR_MONTH' },
+    ];
   }
-  
-  const currThu = new Date(ist);
-  currThu.setDate(currThu.getDate() + daysToThu);
-  
-  const nextThu = new Date(currThu);
-  nextThu.setDate(nextThu.getDate() + 7);
-  
-  function getLastThursday(year, monthIndex) {
-    // Start from last day of month and walk backwards to Thursday (day 4)
-    const lastDay = new Date(year, monthIndex + 1, 0);
-    const lastDayDow = lastDay.getDay();
-    const diff = (lastDayDow - 4 + 7) % 7;
-    lastDay.setDate(lastDay.getDate() - diff);
-    return lastDay;
+
+  // 2. Weekly Contracts (Nifty 50 = Tuesday, Sensex = Thursday)
+  const targetDow = isNifty ? 2 : 4;
+  let daysToTarget = (targetDow - day + 7) % 7;
+  // If today is target day and after 15:40 IST market close, advance to next week
+  if (daysToTarget === 0 && (hh > 15 || (hh === 15 && mm >= 40))) {
+    daysToTarget = 7;
   }
-  
-  let currMonthThu = getLastThursday(ist.getFullYear(), ist.getMonth());
-  // If current month's last Thursday has already passed (after 15:30 IST), roll to next month
-  if (currMonthThu < currThu) {
-    currMonthThu = getLastThursday(ist.getFullYear(), ist.getMonth() + 1);
+
+  const curr = new Date(ist.getFullYear(), ist.getMonth(), ist.getDate() + daysToTarget, 12, 0, 0);
+  const currTarget = shiftToPreviousTradingDay(curr);
+
+  const next = new Date(curr);
+  next.setDate(next.getDate() + 7);
+  const nextTarget = shiftToPreviousTradingDay(next);
+
+  let currMonth = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth(), targetDow);
+  if (toDateString(currMonth) < toDateString(currTarget)) {
+    currMonth = getLastDayOfWeekInMonth(ist.getFullYear(), ist.getMonth() + 1, targetDow);
   }
-  
-  const nextMonthThu = getLastThursday(currMonthThu.getFullYear(), currMonthThu.getMonth() + 1);
-  
-  function fmt(dt) {
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const labelDate = `${dd} ${months[dt.getMonth()]} ${yyyy}`;
-    const formatted = `${dd}-${months[dt.getMonth()]}-${yyyy}`;
-    return {
-      iso: `${yyyy}-${mm}-${dd}`,
-      formatted,
-      labelDate,
-    };
-  }
-  
-  const cW = fmt(currThu);
-  const nW = fmt(nextThu);
-  const cM = fmt(currMonthThu);
-  const nM = fmt(nextMonthThu);
-  
+  const nextMonth = getLastDayOfWeekInMonth(currMonth.getFullYear(), currMonth.getMonth() + 1, targetDow);
+
+  const cW = fmt(currTarget);
+  const nW = fmt(nextTarget);
+  const cM = fmt(currMonth);
+  const nM = fmt(nextMonth);
+
   return [
     { id: cW.iso, date: cW.iso, formatted: cW.formatted, label: `${cW.labelDate} (Current Week)`, type: 'CURRENT_WEEK' },
     { id: nW.iso, date: nW.iso, formatted: nW.formatted, label: `${nW.labelDate} (Next Week)`, type: 'NEXT_WEEK' },
@@ -75,13 +125,29 @@ function getThursdayExpiries(refDate = new Date()) {
   ];
 }
 
+/**
+ * Returns the default active expiry date for a symbol ('YYYY-MM-DD').
+ */
+function getDefaultExpiry(symbol = 'NIFTY', refDate = new Date()) {
+  const expiries = getContractExpiries(symbol, refDate);
+  return expiries[0].id;
+}
+
+/**
+ * Legacy compatibility functions
+ */
+function getThursdayExpiries(refDate = new Date()) {
+  return getContractExpiries('SENSEX', refDate);
+}
+
 function getNextThursdayExpiry(refDate = new Date()) {
-  const expiries = getThursdayExpiries(refDate);
-  return expiries[0].id; // 'YYYY-MM-DD'
+  return getDefaultExpiry('NIFTY', refDate);
 }
 
 module.exports = {
+  getContractExpiries,
+  getDefaultExpiry,
   getThursdayExpiries,
   getNextThursdayExpiry,
+  fmt,
 };
-

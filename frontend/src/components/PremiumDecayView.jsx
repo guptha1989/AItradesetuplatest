@@ -41,11 +41,11 @@ const ALL_INSTRUMENTS = [
   { id: 'SUZLON', name: 'Suzlon Energy (BSE)', category: 'BSE Smallcaps', spot: 65.00, step: 2.5, lotSize: 1000 },
 ];
 
-const CONTRACT_EXPIRIES = [
-  { id: '2026-11-05', label: '05 Nov 2026 (Current Week)' },
-  { id: '2026-11-12', label: '12 Nov 2026 (Next Week)' },
-  { id: '2026-11-26', label: '26 Nov 2026 (Current Month)' },
-  { id: '2026-12-31', label: '31 Dec 2026 (Next Month)' },
+const DEFAULT_CONTRACT_EXPIRIES = [
+  { id: '2026-11-03', label: '03 Nov 2026 (Current Week)' },
+  { id: '2026-11-09', label: '09 Nov 2026 (Next Week)' },
+  { id: '2026-11-23', label: '23 Nov 2026 (Current Month)' },
+  { id: '2026-12-29', label: '29 Dec 2026 (Next Month)' },
 ];
 
 const HISTORICAL_SESSIONS = [
@@ -296,7 +296,8 @@ export default function PremiumDecayView() {
   // Settings State
   const [symbol, setSymbol] = useState('NIFTY');
   const [mode, setMode] = useState('LIVE');
-  const [expiry, setExpiry] = useState('2026-11-05');
+  const [contractExpiries, setContractExpiries] = useState(DEFAULT_CONTRACT_EXPIRIES);
+  const [expiry, setExpiry] = useState('2026-11-03');
   const [timeframeInterval, setTimeframeInterval] = useState('1m');
   const [historicalDate, setHistoricalDate] = useState('2026-10-30');
   
@@ -313,6 +314,22 @@ export default function PremiumDecayView() {
   const selectedInst = ALL_INSTRUMENTS.find(i => i.id === symbol) || ALL_INSTRUMENTS[0];
   const [decayData, setDecayData] = useState(() => buildClientDecaySeries('NIFTY', 23053.10, 4, '2026-10-30'));
   const [lastUpdated, setLastUpdated] = useState(() => formatDateTime());
+
+  // Dynamically load real Dhan contract expiries when symbol changes
+  useEffect(() => {
+    fetch(`/api/chain/expiries?symbol=${symbol}`)
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.success && Array.isArray(res.expiries) && res.expiries.length > 0) {
+          setContractExpiries(res.expiries);
+          const firstDate = res.dhanExpiry || res.expiries[0].id || res.expiries[0].date;
+          if (!expiry || !res.expiries.some(e => (e.id === expiry || e.date === expiry))) {
+            setExpiry(firstDate);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [symbol]);
 
   // Fetch / update live series every 2.5s
   const fetchDecayData = async () => {
@@ -563,8 +580,8 @@ export default function PremiumDecayView() {
               outline: 'none',
             }}
           >
-            {CONTRACT_EXPIRIES.map(exp => (
-              <option key={exp.id} value={exp.id}>{exp.label}</option>
+            {contractExpiries.map(exp => (
+              <option key={exp.id || exp.date} value={exp.id || exp.date}>{exp.label}</option>
             ))}
           </select>
         </div>
@@ -890,13 +907,13 @@ export default function PremiumDecayView() {
                 <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#cbd5e1' }} tickFormatter={(v) => `${v > 0 ? '+' : ''}${v}`} domain={['auto', 'auto']} />
                 <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={1.5} />
                 <Tooltip content={<CustomDecayTooltip />} />
-                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
-                <Line type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2.2} dot={false} isAnimationActive={false} connectNulls />
-                <Area type="monotone" dataKey="ceChange" stroke="none" fill="url(#ceGradient)" isAnimationActive={false} baseValue={0} connectNulls />
-                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
-                <Line type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2.2} dot={false} isAnimationActive={false} connectNulls />
-                <Area type="monotone" dataKey="peChange" stroke="none" fill="url(#peGradient)" isAnimationActive={false} baseValue={0} connectNulls />
-                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} connectNulls />}
+                {futureNormalizedEnabled && <Line type="monotone" dataKey="futureNorm" name="Future Norm" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
+                <Line type="monotone" dataKey="ceChange" name="CE Change (from 9:15)" stroke="#16a34a" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                <Area type="monotone" dataKey="ceChange" stroke="none" fill="url(#ceGradient)" isAnimationActive={false} />
+                {runningAvgEnabled && <Line type="monotone" dataKey="ceAvg" name="CE Avg" stroke="#15803d" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
+                <Line type="monotone" dataKey="peChange" name="PE Change (from 9:15)" stroke="#dc2626" strokeWidth={2.2} dot={false} isAnimationActive={false} />
+                <Area type="monotone" dataKey="peChange" stroke="none" fill="url(#peGradient)" isAnimationActive={false} />
+                {runningAvgEnabled && <Line type="monotone" dataKey="peAvg" name="PE Avg" stroke="#b91c1c" strokeWidth={1.5} strokeDasharray="3 3" dot={false} isAnimationActive={false} />}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -927,9 +944,9 @@ export default function PremiumDecayView() {
                 <XAxis dataKey="displayTime" tick={{ fill: '#64748b', fontSize: 10 }} interval={Math.floor(series.length / 8) || 30} />
                 <YAxis tick={{ fill: '#64748b', fontSize: 10 }} />
                 <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.8rem', color: '#0f172a' }} />
-                <Line type="monotone" dataKey="totalPremium" name="Total Straddle" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
-                <Line type="monotone" dataKey="cePremium" name="CE Premium" stroke="#16a34a" strokeWidth={1.5} dot={false} connectNulls />
-                <Line type="monotone" dataKey="pePremium" name="PE Premium" stroke="#dc2626" strokeWidth={1.5} dot={false} connectNulls />
+                <Line type="monotone" dataKey="totalPremium" name="Total Straddle" stroke="#2563eb" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="cePremium" name="CE Premium" stroke="#16a34a" strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="pePremium" name="PE Premium" stroke="#dc2626" strokeWidth={1.5} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

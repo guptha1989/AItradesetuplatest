@@ -972,7 +972,7 @@ export default function PolicyAlertsView() {
                   const exactTime = ensureDateInTimestamp(alert.exactTriggerTime || alert.timeFormatted || (alert.timestamp ? new Date(alert.timestamp).toLocaleString('en-IN') : '--'));
 
                   return (
-                    <tr key={`${alert.id || 'alert'}_${idx}`} style={{ borderBottom: isDark ? '1px solid #243044' : '1px solid #f1f5f9', background: idx % 2 === 0 ? 'transparent' : (isDark ? 'rgba(255,255,255,0.015)' : '#f8fafc') }}>
+                    <tr key={alert.id || idx} style={{ borderBottom: isDark ? '1px solid #243044' : '1px solid #f1f5f9', background: idx % 2 === 0 ? 'transparent' : (isDark ? 'rgba(255,255,255,0.015)' : '#f8fafc') }}>
                       <td style={{ padding: '8px', color: textMuted }}>{idx + 1}</td>
                       <td style={{ padding: '8px', fontWeight: 700, color: textDark }}>
                         {alert.policyName}

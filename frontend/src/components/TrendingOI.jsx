@@ -31,10 +31,10 @@ const ALL_INSTRUMENTS = [
 ];
 
 const CONTRACT_EXPIRIES = [
-  { id: '05-Nov-2026', label: '05 Nov 2026 (Current Week)' },
-  { id: '12-Nov-2026', label: '12 Nov 2026 (Next Week)' },
-  { id: '26-Nov-2026', label: '26 Nov 2026 (Current Month)' },
-  { id: '31-Dec-2026', label: '31 Dec 2026 (Next Month)' },
+  { id: '03-Nov-2026', label: '03 Nov 2026 (Current Week)' },
+  { id: '09-Nov-2026', label: '09 Nov 2026 (Next Week)' },
+  { id: '23-Nov-2026', label: '23 Nov 2026 (Current Month)' },
+  { id: '29-Dec-2026', label: '29 Dec 2026 (Next Month)' },
 ];
 
 export default function TrendingOI() {
@@ -51,7 +51,7 @@ export default function TrendingOI() {
 
   const [symbol, setSymbol] = useState('NIFTY');
   const [mode, setMode] = useState('live');
-  const [expiryDate, setExpiryDate] = useState('05-Nov-2026');
+  const [expiryDate, setExpiryDate] = useState('03-Nov-2026');
   const [timeframe, setTimeframe] = useState(3);
   
   // Dynamic Strike-selection filter: 2, 3, 4, 5 strikes on either side + ATM
